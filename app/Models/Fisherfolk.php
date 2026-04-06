@@ -15,17 +15,30 @@ class Fisherfolk extends Model
         'system_id', 'first_name', 'middle_name', 'last_name', 'suffix',
         'gender', 'dob', 'age', 'civil_status', 'barangay_id', 'address_details',
         'contact_no', 'education', 'fisher_type', 'is_main_livelihood',
-        'years_in_fishing', 'org_member', 'org_name', 'boat_name', 'boat_type',
-        'engine_hp', 'registration_no', 'gear_type', 'gear_units', 'fishing_area',
+        'years_in_fishing', 'org_member', 'status',
         'farm_name', 'farm_owner', 'farm_location', 'farm_type', 'farm_size',
         'species_cultured', 'permit_no', 'permit_date_issued', 'permit_expiry',
-        'inspection_status', 'beneficiary_program', 'assistance_type',
-        'date_released', 'quantity', 'funding_source', 'status'
+        'inspection_status', 
+        
+        // 🌟 BAG-ONG JSON FIELDS
+        'cooperative_id', 'boats_list', 'assistances_list' 
     ];
 
-    // Relasyon sa Barangay
+    // 🌟 KINI ANG PINAKA IMPORTANTE PARA MA-SAVE OG SAKTO ANG MULTIPLE DATA
+    protected $casts = [
+        'cooperative_id' => 'array',
+        'boats_list' => 'array',
+        'assistances_list' => 'array',
+    ];
+
     public function barangay()
     {
         return $this->belongsTo(Barangay::class, 'barangay_id');
+    }
+
+    public function catchRecords()
+    {
+        // Gi-assume nako nga ang 'system_id' sa Fisherfolk mao ang 'fishr_id' sa FisheryRecord
+        return $this->hasMany(FisheryRecord::class, 'fishr_id', 'system_id');
     }
 }

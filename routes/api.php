@@ -14,6 +14,12 @@ use App\Http\Controllers\Api\CooperativeController;
 use App\Http\Controllers\Api\FisherfolkController;
 use App\Http\Controllers\Api\ClusterController;
 use App\Http\Controllers\Api\ChangePasswordController;
+use App\Http\Controllers\Api\PlantingController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\HarvestController;
+use App\Http\Controllers\Api\FisheryRecordController;
+use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\InventoryController;
 
 Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->get('/user', function (Request $request) {
     return $request->user();
@@ -44,6 +50,18 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::apiResource('cooperatives', CooperativeController::class);
     Route::apiResource('fisherfolks', FisherfolkController::class);
     Route::apiResource('clusters', ClusterController::class);
+    Route::apiResource('plantings', PlantingController::class);
+    Route::delete('/planting-history/{id}', [PlantingController::class, 'destroyHistory']);
+    Route::get('/system/storage-info', [DashboardController::class, 'getStorageInfo']);
+    Route::apiResource('harvests', HarvestController::class);
+    Route::apiResource('fisheries', FisheryRecordController::class);
+
+    Route::get('equipments/lookups', [EquipmentController::class, 'lookups']);
+    Route::apiResource('equipments', EquipmentController::class);
+    Route::apiResource('inventory', InventoryController::class);
+    Route::patch('/inventory/{id}/stock', [InventoryController::class, 'updateStock']);
+    Route::delete('/inventory/transactions/{id}', [InventoryController::class, 'destroyTransaction']);
+    Route::post('/inventory/transactions/{id}/revert', [InventoryController::class, 'revertTransaction']);
 });
 
 

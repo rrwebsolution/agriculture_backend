@@ -6,16 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up()
     {
         Schema::create('farmers', function (Blueprint $table) {
             $table->id();
             
-            // --- IDENTITY & PERSONAL INFO ---
-            $table->string('system_id')->unique(); // e.g., FRM-2026-XXXXXX
+            // --- PERSONAL INFO ---
+            $table->string('system_id')->unique();
             $table->string('rsbsa_no')->unique();
             $table->string('first_name');
             $table->string('middle_name')->nullable();
@@ -23,29 +20,40 @@ return new class extends Migration
             $table->string('suffix')->nullable();
             $table->enum('gender', ['Male', 'Female']);
             $table->date('dob');
-            $table->foreignId('barangay_id')->constrained('barangays')->onDelete('cascade'); // Residence
+            $table->foreignId('barangay_id')->constrained('barangays')->onDelete('cascade');
             $table->string('address_details')->nullable();
             $table->string('contact_no')->nullable();
             
-            // --- FARM PROFILE & TECHNICAL DETAILS ---
+            // 🌟 MULTIPLE FARMS ARRAY
+            $table->json('farms_list')->nullable();
+            
+            // --- SINGLE / LEGACY FARM DETAILS ---
             $table->foreignId('farm_barangay_id')->constrained('barangays')->onDelete('cascade');
             $table->string('farm_sitio')->nullable();
-            $table->foreignId('crop_id')->constrained('crops')->onDelete('cascade'); // Main Crop
-            $table->string('ownership_type'); // Owner, Tenant, Lease
-            $table->decimal('total_area', 10, 4); // In Hectares
-            $table->string('topography'); // Plain, Rolling, Sloping
-            $table->string('irrigation_type'); // Irrigated, Rainfed, Upland
-            $table->text('area_breakdown')->nullable(); // Detailed info per crop
+            $table->foreignId('crop_id')->constrained('crops')->onDelete('cascade');
+            $table->string('ownership_type');
+            $table->decimal('total_area', 10, 4);
+            
+            // 🌟 FARM COORDINATES ARRAY (For Maps)
+            $table->json('farm_coordinates')->nullable();
+            
+            $table->string('topography');
+            $table->string('irrigation_type');
+            $table->text('area_breakdown')->nullable();
             
             // --- AFFILIATIONS ---
             $table->boolean('is_main_livelihood')->default(true);
             $table->boolean('is_coop_member')->default(false);
-            // Foreign key to cooperatives table
-            $table->foreignId('cooperative_id')->nullable()->constrained('cooperatives')->onDelete('set null');
             
-            // --- LGU PROGRAMS / ASSISTANCE (OPTIONAL) ---
+            // 🌟 MULTIPLE COOPERATIVES ARRAY (Diritso na nga JSON, walay foreign key constraint!)
+            $table->json('cooperative_id')->nullable(); 
+            
+            // 🌟 MULTIPLE ASSISTANCE PROGRAMS ARRAY
+            $table->json('assistances_list')->nullable();
+            
+            // --- SINGLE / LEGACY ASSISTANCE PROGRAMS ---
             $table->string('program_name')->nullable();
-            $table->string('assistance_type')->nullable(); // Seeds, Fertilizer, etc.
+            $table->string('assistance_type')->nullable();
             $table->date('date_released')->nullable();
             $table->string('quantity')->nullable();
             $table->decimal('total_cost', 12, 2)->nullable();
@@ -57,9 +65,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('farmers');

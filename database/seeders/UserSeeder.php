@@ -18,6 +18,7 @@ class UserSeeder extends Seeder
             'name' => 'Ryan Reyes',
             'email' => 'ryan@example.com',
             'password' => Hash::make('@password123'),
+            'cluster_id' => 1, // Assuming Cluster ID 1 exists
             // Use the ID from the database, fallback to 1 if not found
             'role_id' => $adminRole ? $adminRole->id : 1, 
             'status' => 'active',

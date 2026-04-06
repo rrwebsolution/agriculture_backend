@@ -30,21 +30,37 @@ class FisherfolkController extends Controller
 
     public function index()
     {
-        $records = Fisherfolk::with('barangay')->latest()->get();
+        $records = Fisherfolk::with(['barangay', 'catchRecords'])->latest()->get();
         return response()->json(['status' => 'success', 'data' => $records]);
     }
 
     public function store(Request $request)
     {
+        // 🌟 GI-UPDATE ANG VALIDATION PARA MO-MATCH SA FRONTEND REQUIRED FIELDS & ARRAYS
         $validated = $request->validate([
-            'system_id'     => 'required|unique:fisherfolks,system_id',
-            'first_name'    => 'required|string',
-            'last_name'     => 'required|string',
-            'gender'        => 'required',
-            'dob'           => 'required|date',
-            'barangay_id'   => 'required|exists:barangays,id',
-            'fisher_type'   => 'required',
-            'status'        => 'required|in:active,inactive'
+            'system_id'          => 'required|unique:fisherfolks,system_id',
+            'first_name'         => 'required|string',
+            'last_name'          => 'required|string',
+            'gender'             => 'required|string',
+            'dob'                => 'required|date',
+            'civil_status'       => 'required|string',
+            'barangay_id'        => 'required|exists:barangays,id',
+            'address_details'    => 'required|string',
+            
+            'fisher_type'        => 'required|string',
+            'years_in_fishing'   => 'required|numeric',
+            
+            // 🌟 Arrays
+            'cooperative_id'     => 'nullable|array',
+            'boats_list'         => 'nullable|array',
+            'assistances_list'   => 'nullable|array',
+
+            // 🌟 Permits & Compliance (Required na base sa imong frontend)
+            'permit_no'          => 'required|string',
+            'permit_date_issued' => 'required|date',
+            'permit_expiry'      => 'required|date',
+            'inspection_status'  => 'required|string',
+            'status'             => 'required|in:active,inactive'
         ]);
 
         $fisher = Fisherfolk::create($request->all());
@@ -68,11 +84,28 @@ class FisherfolkController extends Controller
         // 🌟 I-save ang karaan nga ID para sa update check
         $old_brgy = $fisher->barangay_id;
 
+        // 🌟 UPDATE: Gidugangan og 'sometimes' para sa Partial Updates (e.g. Status toggle only)
         $validated = $request->validate([
-            'first_name'    => 'sometimes|required',
-            'last_name'     => 'sometimes|required',
-            'barangay_id'   => 'sometimes|required|exists:barangays,id',
-            'status'        => 'sometimes|required|in:active,inactive'
+            'first_name'         => 'sometimes|required|string',
+            'last_name'          => 'sometimes|required|string',
+            'gender'             => 'sometimes|required|string',
+            'dob'                => 'sometimes|required|date',
+            'civil_status'       => 'sometimes|required|string',
+            'barangay_id'        => 'sometimes|required|exists:barangays,id',
+            'address_details'    => 'sometimes|required|string',
+            
+            'fisher_type'        => 'sometimes|required|string',
+            'years_in_fishing'   => 'sometimes|required|numeric',
+            
+            'cooperative_id'     => 'nullable|array',
+            'boats_list'         => 'nullable|array',
+            'assistances_list'   => 'nullable|array',
+
+            'permit_no'          => 'sometimes|required|string',
+            'permit_date_issued' => 'sometimes|required|date',
+            'permit_expiry'      => 'sometimes|required|date',
+            'inspection_status'  => 'sometimes|required|string',
+            'status'             => 'sometimes|required|in:active,inactive'
         ]);
 
         $fisher->update($request->all());

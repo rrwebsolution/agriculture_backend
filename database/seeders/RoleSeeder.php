@@ -14,22 +14,73 @@ class RoleSeeder extends Seeder
                 'name' => 'System Administrator',
                 'description' => 'Full system access, managing users, roles, and global configurations.',
                 'permissions' => [
-                    "Dashboard: View Overview Analytics","Dashboard: Export Daily Statistics",
-                    "Farmer Registry: Manage Registered Farmers","Farmer Registry: Manage Cooperatives",
-                    "Farmer Registry: Export Registry List","Production: Manage Crops","Production: Manage Planting Logs",
-                    "Production: Manage Harvest Records","Livestock & Fish: Manage Fisheries","Livestock & Fish: Manage 
-                    Livestock","Livestock & Fish: Manage Poultry","Resources: Manage Inventory","Resources: Manage Equipments",
-                    "Resources: Manage Land Mapping","Finance: Manage Expenses","Finance: View Financial Reports",
-                    "Finance: Delete Records","Access Control: Manage Roles","Access Control: Manage Users",
-                    "Access Control: Assign Permissions","Audit Logs: View System Audit Logs","Audit Logs: Export Audit PDF",
-                    "System Settings: Configure Global Settings","System Settings: Manage System Backups",
-                    "Locations: Manage Barangay List","Locations: Manage Clusters"
+                    // Dashboard
+                    "Dashboard: View Overview Analytics",
+                    
+                    // Farmer Registry
+                    "Farmer Registry: View Registered Farmers",
+                    "Farmer Registry: Manage Registered Farmers",
+                    
+                    // Fisherfolk Registry
+                    "Fisherfolk Registry: View Registered Fisherfolks",
+                    "Fisherfolk Registry: Manage Registered Fisherfolks",
+                    
+                    // Cooperatives
+                    "Cooperatives: View Cooperatives",
+                    "Cooperatives: Manage Cooperatives",
+                    
+                    // Locations
+                    "Locations: View Barangay List",
+                    "Locations: Manage Barangay List",
+                    "Locations: View Clusters",
+                    "Locations: Manage Clusters",
+                    
+                    // Production (Crop Agriculture)
+                    "Production: View Crops",
+                    "Production: Manage Crops",
+                    "Production: View Planting Logs",
+                    "Production: Manage Planting Logs",
+                    "Production: View Harvest Records",
+                    "Production: Manage Harvest Records",
+                    
+                    // Fishery
+                    "Fishery: View Fisheries",
+                    "Fishery: Manage Fisheries",
+                    
+                    // Resources
+                    "Resources: View Inventory",
+                    "Resources: Manage Inventory",
+                    "Resources: View Equipments",
+                    "Resources: Manage Equipments",
+                    "Resources: View Land Mapping",
+                    "Resources: Manage Land Mapping",
+                    
+                    // Finance
+                    "Finance: View Expenses",
+                    "Finance: Manage Expenses",
+                    "Finance: View Financial Reports",
+                    
+                    // Access Control
+                    "Access Control: View Roles",
+                    "Access Control: Manage Roles",
+                    "Access Control: View Users",
+                    "Access Control: Manage Users",
+                    
+                    // Audit Logs
+                    "Audit Logs: View System Audit Logs",
+                    
+                    // System Settings
+                    "System Settings: View Global Settings",
+                    "System Settings: Configure Global Settings"
                 ]
             ],
         ];
 
         foreach ($roles as $role) {
-            Role::create($role);
+            Role::updateOrCreate(
+                ['name' => $role['name']], // Check if role exists by name
+                ['description' => $role['description'], 'permissions' => $role['permissions']]
+            );
         }
     }
 }

@@ -9,13 +9,18 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         Schema::create('barangays', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('code')->unique();
             $table->enum('type', ['Urban (Poblacion)', 'Rural', 'Coastal']);
+            
+            // Merged Coordinates here
+            $table->decimal('latitude', 10, 7)->nullable(); 
+            $table->decimal('longitude', 10, 7)->nullable();
+            
             $table->timestamps();
         });
     }

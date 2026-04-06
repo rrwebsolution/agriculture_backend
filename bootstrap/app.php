@@ -41,6 +41,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/farm-locations/*',
             'broadcasting/auth',
             'api/update-password',
+            'api/plantings',
+            'api/plantings/*',
+            'api/planting-history/*',
+            'api/system/storage-info',
+            'api/harvests',
+            'api/harvests/*',
+            'api/fisheries',
+            'api/fisheries/*',
+            'api/equipments',
+            'api/equipments/*',
+            'api/inventory',
+            'api/inventory/*',
 
         ]);
 

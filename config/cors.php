@@ -30,7 +30,10 @@ return [
 
     'exposed_headers' => [],
 
-    'max_age' => 0,
+    // 🌟 GI-UPDATE: 86400 seconds (24 hours). 
+    // Gitudloan ang browser nga i-cache ang preflight (OPTIONS) 
+    // aron dili na mag sige'g padala og duplicate request kada click.
+    'max_age' => 86400,
 
     'supports_credentials' => false,
 

@@ -9,10 +9,11 @@ class Cooperative extends Model
 {
     use HasFactory;
 
+    // 🌟 Updated fillable (Removed member_count, Added registration & org_type)
     protected $fillable = [
-        'system_id', 'cda_no', 'name', 'type', 'chairman', 
-        'contact_no', 'barangay_id', 'address_details', 
-        'member_count', 'capital_cbu', 'status'
+        'system_id', 'cda_no', 'name', 'type', 'registration', 'org_type',
+        'chairman', 'contact_no', 'barangay_id', 'address_details', 
+        'capital_cbu', 'status'
     ];
 
     public function barangay()
@@ -20,18 +21,15 @@ class Cooperative extends Model
         return $this->belongsTo(Barangay::class);
     }
 
-    public function farmers()
-    {
-        return $this->hasMany(Farmer::class);
-    }
-
+    // Since Farmer's cooperative_id is a JSON Array, standard hasMany might fail. 
+    // We handle the Farmer mapping inside the controller instead for accuracy and speed.
+    
     public function fisheries() {
         return $this->hasMany(Fishery::class, 'cooperative_id');
     }
 
-     public function crops()
+    public function crops()
     {
         return $this->hasMany(Crop::class);
     }
-
 }

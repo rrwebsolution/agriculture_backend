@@ -19,7 +19,7 @@ class CropController extends Controller
                 },
                 'registeredFarmers.barangay',
                 'registeredFarmers.farmLocation'
-            ])
+            ])->orderBy('id', 'asc')
             ->get();
 
         $crops->map(function ($crop) {
@@ -53,37 +53,45 @@ class CropController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        $crop = Crop::findOrFail($id);
+{
+    $crop = Crop::findOrFail($id);
 
-        $validatedData = $request->validate([
-            'category' => 'required|string|max:255',
-            'remarks'  => 'required|string',
-        ]);
+    $validatedData = $request->validate([
+        'category' => 'required|string|max:255',
+        'remarks'  => 'required|string',
+    ]);
 
-        $crop->update($validatedData);
+    $crop->update($validatedData);
 
-        // 🌟 I-load balik ang relationships ug format
-        $crop->loadCount('registeredFarmers');
-        $crop->load([
-            'registeredFarmers' => function($query) {
-                $query->latest();
-            },
-            'registeredFarmers.barangay',
-            'registeredFarmers.farmLocation'
-        ]);
-        
-        $crop->farmers = $crop->registered_farmers_count;
-        $crop->registered_farmers = $crop->registeredFarmers;
-
-        // 🌟 BROADCAST EVENT: UPDATED
-        event(new CropUpdated($crop, 'updated'));
-
-        return response()->json([
-            'message' => 'Land record successfully updated!',
-            'data'    => $crop
-        ]);
+    // 🌟 I-notify ang tanang planting logs nga naggamit niini nga crop
+    // Siguroon nato nga dili null ang plantings
+    if ($crop->plantings) {
+        $crop->plantings->each(function ($planting) {
+            $p = $planting->fresh(['farmer', 'barangay', 'crop', 'statusHistory']);
+            // I-broadcast as PlantingUpdated para sa Table
+            broadcast(new \App\Events\PlantingUpdated($p, 'updated'));
+        });
     }
+
+    // Refresh data para sa Crop module mismo
+    $crop->loadCount('registeredFarmers');
+    $crop->load([
+        'registeredFarmers' => function($query) { $query->latest(); },
+        'registeredFarmers.barangay',
+        'registeredFarmers.farmLocation'
+    ]);
+    
+    $crop->farmers = $crop->registered_farmers_count;
+    $crop->registered_farmers = $crop->registeredFarmers;
+
+    // BROADCAST PARA SA CROP MODULE & DROPDOWNS
+    broadcast(new CropUpdated($crop, 'updated'));
+
+    return response()->json([
+        'message' => 'Land record successfully updated!',
+        'data'    => $crop
+    ]);
+}
 
     public function destroy($id)
     {

@@ -32,6 +32,9 @@ return new class extends Migration
             $table->integer('years_in_fishing')->nullable();
             $table->boolean('org_member')->default(false);
             $table->string('org_name')->nullable();
+            
+            // 🌟 MERGED: Added cooperative_id as JSON
+            $table->json('cooperative_id')->nullable(); 
 
             // Boat & Gear Details
             $table->string('boat_name')->nullable();
@@ -41,6 +44,9 @@ return new class extends Migration
             $table->string('gear_type')->nullable();
             $table->integer('gear_units')->nullable();
             $table->string('fishing_area')->nullable();
+            
+            // 🌟 MERGED: Added boats_list as JSON
+            $table->json('boats_list')->nullable();
 
             // Aquaculture (Optional for Operators)
             $table->string('farm_name')->nullable();
@@ -62,6 +68,9 @@ return new class extends Migration
             $table->date('date_released')->nullable();
             $table->string('quantity')->nullable();
             $table->string('funding_source')->nullable();
+            
+            // 🌟 MERGED: Added assistances_list as JSON
+            $table->json('assistances_list')->nullable();
 
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
