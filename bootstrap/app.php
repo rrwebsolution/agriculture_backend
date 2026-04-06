@@ -31,6 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/farmers/*',
             'api/barangays',
             'api/barangays/*',
+            'api/fishery',
+            'api/fishery/*',
             'api/fisherfolks',
             'api/fisherfolks/*',
             'api/crops',
@@ -53,6 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/equipments/*',
             'api/inventory',
             'api/inventory/*',
+
 
         ]);
 

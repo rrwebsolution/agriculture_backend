@@ -29,7 +29,7 @@ class Barangay extends Model
     public function cooperatives() { return $this->hasMany(Cooperative::class); }
     public function crops() { return $this->hasMany(Crop::class); }
     public function programs() { return $this->hasMany(Program::class); }
-    public function fisherfolks() { return $this->hasMany(FisherFolk::class, 'barangay_id'); }
+    public function fisherfolks() { return $this->hasMany(Fisherfolk::class, 'barangay_id'); }
     public function farmers() { return $this->hasMany(Farmer::class); }
     public function harvests() { return $this->hasMany(Harvest::class); }
 
