@@ -45,7 +45,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
 
     Route::apiResource('farmers', FarmerController::class);
     Route::apiResource('barangays', BarangayController::class);
-    Route::apiResource('fisherfolks', FisheryController::class);
+    // Route::apiResource('fisherfolks', FisheryController::class);
     Route::apiResource('crops', CropController::class);
     Route::apiResource('cooperatives', CooperativeController::class);
     Route::apiResource('fisherfolks', FisherfolkController::class);
