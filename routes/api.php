@@ -25,7 +25,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     return $request->user();
 });
 
-Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('guest')->name('register');
+Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('guest')->name('api.register');
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 
 
