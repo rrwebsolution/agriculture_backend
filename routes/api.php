@@ -28,7 +28,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
 Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('guest')->name('api.register');
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 
-
+Route::apiResource('barangays', BarangayController::class);
 
 Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->group(function () {
     Route::post('/update-password', [ChangePasswordController::class, 'updatePassword']);
@@ -44,7 +44,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
 
     Route::apiResource('farmers', FarmerController::class);
-    Route::apiResource('barangays', BarangayController::class);
+    
     // Route::apiResource('fisherfolks', FisheryController::class);
     Route::apiResource('crops', CropController::class);
     Route::apiResource('cooperatives', CooperativeController::class);
