@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::apiResource('clusters', ClusterController::class);
     Route::apiResource('plantings', PlantingController::class);
     Route::delete('/planting-history/{id}', [PlantingController::class, 'destroyHistory']);
-    Route::get('/system/storage-info', [DashboardController::class, 'getStorageInfo']);
+    Route::get('/dashboard/stats', [DashboardController::class, 'index']);
     Route::apiResource('harvests', HarvestController::class);
     Route::apiResource('fisheries', FisheryRecordController::class);
 
