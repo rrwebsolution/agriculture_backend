@@ -22,7 +22,7 @@ return [
     // During mobile debugging it's helpful to allow the device origin.
     // For quick testing we allow all origins and disable credentialed requests.
     // IMPORTANT: revert to stricter origins and enable credentials when done.
-    'allowed_origins' => ['*'],
+    'allowed_origins' => ['https://agriculture-murex-omega.vercel.app'],
 
     'allowed_origins_patterns' => [],
 
