@@ -54,6 +54,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/inventory',
             'api/inventory/*',
             'api/dashboard/stats',
+            'api/expenses',
+            'api/expenses/*',
             
 
 

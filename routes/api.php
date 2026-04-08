@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\HarvestController;
 use App\Http\Controllers\Api\FisheryRecordController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\ExpenseController;
 
 Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->get('/user', function (Request $request) {
     return $request->user();
@@ -62,6 +63,9 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::patch('/inventory/{id}/stock', [InventoryController::class, 'updateStock']);
     Route::delete('/inventory/transactions/{id}', [InventoryController::class, 'destroyTransaction']);
     Route::post('/inventory/transactions/{id}/revert', [InventoryController::class, 'revertTransaction']);
+
+    Route::apiResource('expenses', ExpenseController::class);
+    Route::post('expenses/{id}/restore', [ExpenseController::class, 'restore']);
 });
 
 
