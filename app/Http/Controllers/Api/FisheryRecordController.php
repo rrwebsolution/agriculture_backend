@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\FisheryUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\FisheryRecord;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ class FisheryRecordController extends Controller
         ]);
 
         $record = FisheryRecord::create($validated);
+        event(new FisheryUpdated($record, 'created'));
         return response()->json(['message' => 'Catch record saved successfully.', 'data' => $record], 201);
     }
 
@@ -53,6 +55,7 @@ class FisheryRecordController extends Controller
         ]);
 
         $record->update($validated);
+        event(new FisheryUpdated($record, 'updated'));
         return response()->json(['message' => 'Catch record updated successfully.', 'data' => $record], 200);
     }
 
@@ -60,6 +63,7 @@ class FisheryRecordController extends Controller
     {
         $record = FisheryRecord::findOrFail($id);
         $record->delete();
+        event(new FisheryUpdated($record, 'deleted'));
         return response()->json(['message' => 'Catch record deleted successfully.'], 200);
     }
 }

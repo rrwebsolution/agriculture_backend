@@ -16,10 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
-         $middleware->validateCsrfTokens(except: [
-            'api/login', 
+        $middleware->validateCsrfTokens(except: [
+            'api/login',
             'api/logout',
             'api/register',
+            'api/forgot-password',
+            'api/reset-password',
             'api/roles',
             'api/roles/*',
             'api/clusters',
@@ -56,8 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/dashboard/stats',
             'api/expenses',
             'api/expenses/*',
-            
-
+            'api/reports',
+            'api/reports/*',
 
         ]);
 

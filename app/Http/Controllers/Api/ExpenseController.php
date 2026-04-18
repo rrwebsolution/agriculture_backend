@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\ExpenseUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class ExpenseController extends Controller
         }
 
         $expense = Expense::create($request->all());
+        event(new ExpenseUpdated($expense, 'created'));
 
         return response()->json([
             'message' => 'Expense logged successfully',
@@ -67,6 +69,7 @@ class ExpenseController extends Controller
         }
 
         $expense->update($request->all());
+        event(new ExpenseUpdated($expense, 'updated'));
 
         return response()->json([
             'message' => 'Expense updated successfully',
@@ -78,6 +81,7 @@ class ExpenseController extends Controller
     {
         $expense = Expense::findOrFail($id);
         $expense->delete();
+        event(new ExpenseUpdated($expense, 'deleted'));
 
         return response()->json(['message' => 'Record deleted successfully']);
     }
@@ -87,6 +91,8 @@ class ExpenseController extends Controller
         // Pangitaon ang record sa mga na-delete
         $expense = Expense::onlyTrashed()->findOrFail($id);
         $expense->restore(); // I-restore ang record
+        $expense->refresh();
+        event(new ExpenseUpdated($expense, 'restored'));
 
         return response()->json([
             'message' => 'Record restored successfully',

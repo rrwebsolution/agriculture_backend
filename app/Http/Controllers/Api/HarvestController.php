@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\HarvestUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Harvest;
 use Illuminate\Http\Request;
@@ -34,6 +35,7 @@ class HarvestController extends Controller
         
         // 🌟 UPDATED: Load 'barangay'
         $harvest->load(['farmer', 'barangay', 'crop']); 
+        event(new HarvestUpdated($harvest, 'created'));
 
         return response()->json([
             'message' => 'Harvest recorded successfully.',
@@ -59,6 +61,7 @@ class HarvestController extends Controller
         
         // 🌟 UPDATED: Load 'barangay'
         $harvest->load(['farmer', 'barangay', 'crop']); 
+        event(new HarvestUpdated($harvest, 'updated'));
 
         return response()->json([
             'message' => 'Harvest updated successfully.',
@@ -69,7 +72,9 @@ class HarvestController extends Controller
     public function destroy($id)
     {
         $harvest = Harvest::findOrFail($id);
+        $harvest->load(['farmer', 'barangay', 'crop']);
         $harvest->delete();
+        event(new HarvestUpdated($harvest, 'deleted'));
 
         return response()->json(['message' => 'Harvest deleted successfully.'], 200);
     }
