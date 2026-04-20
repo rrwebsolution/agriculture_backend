@@ -72,8 +72,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
-            $table->dropForeign(['cluster_id']);
+            $table->dropForeignIfExists('users_role_id_foreign');
+            $table->dropForeignIfExists('users_cluster_id_foreign');
         });
         Schema::dropIfExists('sessions');
         Schema::dropIfExists('password_reset_tokens');
