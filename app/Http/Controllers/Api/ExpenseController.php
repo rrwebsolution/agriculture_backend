@@ -79,7 +79,16 @@ class ExpenseController extends Controller
 
     public function destroy($id)
     {
-        $expense = Expense::findOrFail($id);
+        $expense = Expense::withTrashed()->findOrFail($id);
+
+        if ($expense->trashed()) {
+            $expenseSnapshot = clone $expense;
+            $expense->forceDelete();
+            event(new ExpenseUpdated($expenseSnapshot, 'force_deleted'));
+
+            return response()->json(['message' => 'Record permanently deleted successfully']);
+        }
+
         $expense->delete();
         event(new ExpenseUpdated($expense, 'deleted'));
 

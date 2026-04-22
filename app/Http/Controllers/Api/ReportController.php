@@ -19,9 +19,6 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
-    // ─────────────────────────────────────────────
-    // GET /api/reports
-    // ─────────────────────────────────────────────
     public function index()
     {
         $reports = Report::latest('generated_at')->get();
@@ -32,10 +29,6 @@ class ReportController extends Controller
         ]);
     }
 
-    // ─────────────────────────────────────────────
-    // POST /api/reports
-    // Creates record then generates the actual file.
-    // ─────────────────────────────────────────────
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -45,12 +38,13 @@ class ReportController extends Controller
             'period_from' => 'required|date',
             'period_to' => 'required|date|after_or_equal:period_from',
             'format' => ['required', Rule::in(['PDF', 'XLSX'])],
-            'status' => ['required', Rule::in(['Published', 'Pending Review', 'Draft'])],
+            'status' => ['nullable', Rule::in(['Published', 'Pending Review', 'Draft'])],
             'notes' => 'nullable|string|max:2000',
         ]);
 
         $validated['generated_by'] = Auth::user()->name ?? 'System';
         $validated['generated_at'] = now();
+        $validated['status'] = $validated['status'] ?? 'Published';
 
         $report = Report::create($validated);
 
@@ -58,7 +52,7 @@ class ReportController extends Controller
             $filePath = $this->generateFile($report);
             $report->update(['file_path' => $filePath]);
         } catch (\Exception $e) {
-            \Log::error("Report file generation failed for ID {$report->id}: ".$e->getMessage());
+            \Log::error("Report file generation failed for ID {$report->id}: " . $e->getMessage());
         }
 
         return response()->json([
@@ -67,12 +61,17 @@ class ReportController extends Controller
         ], 201);
     }
 
-    // ─────────────────────────────────────────────
-    // GET /api/reports/{id}/download
-    // ─────────────────────────────────────────────
     public function download(Report $report)
     {
-        if (! $report->file_path || ! Storage::exists($report->file_path)) {
+        try {
+            $filePath = $this->generateFile($report);
+            $report->update(['file_path' => $filePath]);
+            $report->refresh();
+        } catch (\Exception $e) {
+            \Log::error("Report regeneration failed for ID {$report->id}: " . $e->getMessage());
+        }
+
+        if (!$report->file_path || !Storage::exists($report->file_path)) {
             return response()->json([
                 'message' => 'No file available for this report yet.',
             ], 404);
@@ -90,9 +89,6 @@ class ReportController extends Controller
         ]);
     }
 
-    // ─────────────────────────────────────────────
-    // DELETE /api/reports/{id}
-    // ─────────────────────────────────────────────
     public function destroy(Report $report)
     {
         if ($report->file_path && Storage::exists($report->file_path)) {
@@ -106,9 +102,6 @@ class ReportController extends Controller
         ]);
     }
 
-    // ─────────────────────────────────────────────
-    // PRIVATE: Generate PDF or XLSX, return storage path
-    // ─────────────────────────────────────────────
     private function generateFile(Report $report): string
     {
         $data = $this->fetchReportData($report);
@@ -130,9 +123,6 @@ class ReportController extends Controller
         return $path;
     }
 
-    // ─────────────────────────────────────────────
-    // PRIVATE: Fetch rows for each report type
-    // ─────────────────────────────────────────────
     private function fetchReportData(Report $report): array
     {
         return match ($report->type) {
@@ -146,6 +136,48 @@ class ReportController extends Controller
         };
     }
 
+    private function textValue(mixed $value, string $fallback = 'Not Available'): string
+    {
+        $normalized = is_string($value) ? trim($value) : $value;
+
+        if ($normalized === null || $normalized === '') {
+            return $fallback;
+        }
+
+        return (string) $normalized;
+    }
+
+    private function numberValue(mixed $value, int $decimals = 2): string
+    {
+        return number_format((float) ($value ?? 0), $decimals);
+    }
+
+    private function measurementValue(mixed $value, ?string $defaultUnit = null, string $fallback = 'Not Available', int $decimals = 2): string
+    {
+        $normalized = is_string($value) ? trim($value) : $value;
+
+        if ($normalized === null || $normalized === '') {
+            return $fallback;
+        }
+
+        if (is_string($normalized) && preg_match('/[A-Za-z]/', $normalized)) {
+            return $normalized;
+        }
+
+        $formatted = number_format((float) $normalized, $decimals);
+
+        return $defaultUnit ? "{$formatted} {$defaultUnit}" : $formatted;
+    }
+
+    private function dateValue(mixed $value, string $fallback = 'Not Available'): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return $this->textValue($value, $fallback);
+    }
+
     private function fetchProduction($from, $to): array
     {
         $harvests = Harvest::with(['farmer', 'barangay', 'crop'])
@@ -153,15 +185,15 @@ class ReportController extends Controller
             ->orderBy('dateHarvested')
             ->get();
 
-        $headers = ['Farmer', 'Crop', 'Barangay', 'Date Harvested', 'Quantity (kg)', 'Quality', 'Value (₱)'];
+        $headers = ['Farmer', 'Crop', 'Barangay', 'Date Harvested', 'Quantity', 'Quality', 'Value (PHP)'];
         $rows = $harvests->map(fn ($h) => [
-            trim(($h->farmer->first_name ?? '').' '.($h->farmer->last_name ?? '')) ?: '—',
-            $h->crop->name ?? '—',
-            $h->barangay->name ?? '—',
-            $h->dateHarvested,
-            $h->quantity,
-            $h->quality ?? '—',
-            number_format((float) $h->value, 2),
+            $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Unknown Farmer'),
+            $this->textValue($h->crop->name ?? $h->crop->category ?? null, 'Unknown Crop'),
+            $this->textValue($h->barangay->name ?? null, 'Unknown Barangay'),
+            $this->dateValue($h->dateHarvested, 'Unknown Date'),
+            $this->measurementValue($h->quantity),
+            $this->textValue($h->quality, 'Unspecified'),
+            $this->numberValue($h->value),
         ])->toArray();
 
         return compact('headers', 'rows');
@@ -173,16 +205,16 @@ class ReportController extends Controller
             ->orderBy('date')
             ->get();
 
-        $headers = ['Name', 'Boat', 'Gear Type', 'Fishing Area', 'Species', 'Yield (kg)', 'Market Value (₱)', 'Date'];
+        $headers = ['Name', 'Boat', 'Gear Type', 'Fishing Area', 'Species', 'Yield (kg)', 'Market Value (PHP)', 'Date'];
         $rows = $records->map(fn ($r) => [
-            $r->name ?? '—',
-            $r->boat_name ?? '—',
-            $r->gear_type ?? '—',
-            $r->fishing_area ?? '—',
-            $r->catch_species ?? '—',
-            $r->yield,
-            number_format((float) $r->market_value, 2),
-            $r->date,
+            $this->textValue($r->name, 'Unknown Fisherfolk'),
+            $this->textValue($r->boat_name, 'No Boat Listed'),
+            $this->textValue($r->gear_type, 'Unspecified'),
+            $this->textValue($r->fishing_area, 'Unspecified'),
+            $this->textValue($r->catch_species, 'Unspecified'),
+            $this->measurementValue($r->yield, 'kg', '0.00 kg'),
+            $this->numberValue($r->market_value),
+            $this->dateValue($r->date, 'Unknown Date'),
         ])->toArray();
 
         return compact('headers', 'rows');
@@ -202,16 +234,16 @@ class ReportController extends Controller
             ->orderBy('date_incurred')
             ->get();
 
-        $headers = ['Ref No.', 'Item', 'Category', 'Project', 'Amount (₱)', 'Date', 'Status', 'Remarks'];
+        $headers = ['Ref No.', 'Item', 'Category', 'Project', 'Amount (PHP)', 'Date', 'Status', 'Remarks'];
         $rows = $expenses->map(fn ($e) => [
-            $e->ref_no ?? '—',
-            $e->item ?? '—',
-            $e->category ?? '—',
-            $e->project ?? '—',
-            number_format((float) $e->amount, 2),
-            $e->date_incurred?->format('Y-m-d'),
-            $e->status ?? '—',
-            $e->remarks ?? '—',
+            $this->textValue($e->ref_no, 'No Reference'),
+            $this->textValue($e->item, 'Unnamed Expense'),
+            $this->textValue($e->category, 'Uncategorized'),
+            $this->textValue($e->project, 'Unassigned Project'),
+            $this->numberValue($e->amount),
+            $this->dateValue($e->date_incurred, 'Unknown Date'),
+            $this->textValue($e->status, 'Unspecified'),
+            $this->textValue($e->remarks, 'No Remarks'),
         ])->toArray();
 
         $total = $expenses->sum('amount');
@@ -227,14 +259,14 @@ class ReportController extends Controller
 
         $headers = ['Full Name', 'Gender', 'Barangay', 'Contact No.', 'Primary Crop', 'Farm Area (ha)', 'Ownership', 'Status'];
         $rows = $farmers->map(fn ($f) => [
-            trim("{$f->last_name}, {$f->first_name}".($f->middle_name ? ' '.$f->middle_name[0].'.' : '')),
-            $f->gender ?? '—',
-            $f->barangay->name ?? '—',
-            $f->contact_no ?? '—',
-            $f->crop->name ?? '—',
-            $f->total_area ?? '—',
-            $f->ownership_type ?? '—',
-            $f->status ?? '—',
+            $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Farmer'),
+            $this->textValue($f->gender, 'Unspecified'),
+            $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
+            $this->textValue($f->contact_no, 'No Contact'),
+            $this->textValue($f->crop->name ?? $f->crop->category ?? null, 'Unknown Crop'),
+            $this->numberValue($f->total_area),
+            $this->textValue($f->ownership_type, 'Unspecified'),
+            $this->textValue($f->status, 'Unspecified'),
         ])->toArray();
 
         return compact('headers', 'rows');
@@ -246,14 +278,14 @@ class ReportController extends Controller
 
         $headers = ['Item Name', 'Commodity', 'Category', 'SKU', 'Stock', 'Unit', 'Status', 'Year'];
         $rows = $items->map(fn ($i) => [
-            $i->name ?? '—',
-            $i->commodity ?? '—',
-            $i->category ?? '—',
-            $i->sku ?? '—',
-            $i->stock,
-            $i->unit ?? '—',
-            $i->status ?? '—',
-            $i->year ?? '—',
+            $this->textValue($i->name, 'Unnamed Item'),
+            $this->textValue($i->commodity, 'Unspecified'),
+            $this->textValue($i->category, 'Uncategorized'),
+            $this->textValue($i->sku, 'No SKU'),
+            $this->numberValue($i->stock),
+            $this->textValue($i->unit, 'Unspecified'),
+            $this->textValue($i->status, 'Unspecified'),
+            $this->textValue($i->year, 'Unknown Year'),
         ])->toArray();
 
         return compact('headers', 'rows');

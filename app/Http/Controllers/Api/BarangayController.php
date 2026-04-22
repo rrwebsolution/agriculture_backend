@@ -12,8 +12,8 @@ class BarangayController extends Controller
 {
     private function mapCooperativesWithMembers($cooperatives)
     {
-        $allFarmers = \App\Models\Farmer::with('crop')->whereNotNull('cooperative_id')->get();
-        $allFisherfolks = \App\Models\Fisherfolk::whereNotNull('cooperative_id')->get();
+        $allFarmers = \App\Models\Farmer::with(['barangay', 'crop', 'farmLocation'])->whereNotNull('cooperative_id')->get();
+        $allFisherfolks = \App\Models\Fisherfolk::with(['barangay', 'catchRecords'])->whereNotNull('cooperative_id')->get();
         $crops = \App\Models\Crop::pluck('category', 'id');
 
         return $cooperatives->map(function ($coop) use ($allFarmers, $allFisherfolks, $crops) {
@@ -84,16 +84,17 @@ class BarangayController extends Controller
     public function index()
     {
         $barangays = Barangay::with([
+            'farmers.barangay',
             'farmers.farmLocation', 
             'farmers.crop', 
-            'fisherfolks', 
+            'fisherfolks.barangay',
+            'fisherfolks.catchRecords',
             'cooperatives',
             'harvests.crop', 
             'harvests.farmer',
             'plantings.crop',           
             'plantings.farmer',         
             'plantings.statusHistory', 
-            'fisherfolks.catchRecords',
         ])->get();
 
         $formattedData = $barangays->map(function ($b) {

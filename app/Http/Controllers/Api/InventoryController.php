@@ -10,26 +10,83 @@ use App\Models\Cooperative;
 use App\Models\InventoryTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InventoryController extends Controller
 {
+    private const CATEGORY_PREFIX_MAP = [
+        'Seed distribution' => 'SEED',
+        'Fertilizer distribution(Inorganic)' => 'FERT-INORG',
+        'Fertilizer distribution(Organic)' => 'FERT-ORG',
+        'Commodity based(Package)' => 'COMM',
+        'Tools and equipments' => 'TOOL',
+    ];
+
     public function index()
 {
     return response()->json([
         // Gigamitan og 'with' para ma-apil ang transactions relationship
         'inventories' => Inventory::with('transactions')->orderBy('created_at', 'desc')->get(),
         'farmers' => Farmer::select('id', 'first_name', 'last_name', 'rsbsa_no')->get(),
-        'fisherfolks' => Fisherfolk::select('id', 'first_name', 'last_name', 'system_id')->get(),
-        'cooperatives' => Cooperative::select('id', 'name', 'system_id')->get(),
+        'fisherfolks' => Fisherfolk::select('id', 'first_name', 'last_name', 'system_id', 'registration_no')->get(),
+        'cooperatives' => Cooperative::select('id', 'name', 'system_id', 'cda_no')->get(),
     ]);
 }
+
+    private function getCategoryPrefix(?string $category): string
+    {
+        if (!$category) {
+            return 'ITEM';
+        }
+
+        if (isset(self::CATEGORY_PREFIX_MAP[$category])) {
+            return self::CATEGORY_PREFIX_MAP[$category];
+        }
+
+        $normalized = strtoupper((string) Str::of($category)
+            ->replaceMatches('/[^A-Za-z0-9]+/', '-')
+            ->trim('-'));
+
+        return $normalized !== '' ? $normalized : 'ITEM';
+    }
+
+    private function nextSequence(string $column, string $prefix, string $year): int
+    {
+        $likePattern = $prefix . '-' . $year . '-%';
+
+        $latestValue = Inventory::where($column, 'like', $likePattern)
+            ->orderByDesc($column)
+            ->value($column);
+
+        if (!$latestValue || !preg_match('/(\d+)$/', $latestValue, $matches)) {
+            return 1;
+        }
+
+        return ((int) $matches[1]) + 1;
+    }
+
+    private function generateSku(?string $category, string $year): string
+    {
+        $prefix = $this->getCategoryPrefix($category);
+        $sequence = str_pad((string) $this->nextSequence('sku', $prefix, $year), 3, '0', STR_PAD_LEFT);
+
+        return "{$prefix}-{$year}-{$sequence}";
+    }
+
+    private function generateBatch(string $year): string
+    {
+        $prefix = 'B';
+        $sequence = str_pad((string) $this->nextSequence('batch', $prefix, $year), 3, '0', STR_PAD_LEFT);
+
+        return "{$prefix}-{$year}-{$sequence}";
+    }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string',
             'category' => 'required|string',
-            'sku' => 'required|string|unique:inventories,sku',
+            'sku' => 'nullable|string|unique:inventories,sku',
             'stock' => 'required|integer|min:0',
             'unit' => 'required|string',
             'threshold' => 'required|integer',
@@ -41,6 +98,14 @@ class InventoryController extends Controller
             // Gidugang nato kini para sa initial transaction source
             'source' => 'nullable|string' 
         ]);
+
+        $validated['year'] = (string) ($validated['year'] ?: now()->year);
+        $validated['sku'] = !empty($validated['sku'])
+            ? strtoupper($validated['sku'])
+            : $this->generateSku($validated['category'] ?? null, $validated['year']);
+        $validated['batch'] = !empty($validated['batch'])
+            ? strtoupper($validated['batch'])
+            : $this->generateBatch($validated['year']);
 
         $item = DB::transaction(function () use ($validated, $request) {
         $inventory = Inventory::create($validated);
@@ -67,7 +132,7 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string',
             'category' => 'required|string',
-            'sku' => 'required|string|unique:inventories,sku,' . $id, 
+            'sku' => 'nullable|string|unique:inventories,sku,' . $id, 
             'stock' => 'required|integer|min:0',
             'unit' => 'required|string',
             'threshold' => 'required|integer',
@@ -77,6 +142,14 @@ class InventoryController extends Controller
             'year' => 'required|string',
             'remarks' => 'nullable|string'
         ]);
+
+        $validated['year'] = (string) ($validated['year'] ?: $item->year ?: now()->year);
+        $validated['sku'] = !empty($validated['sku'])
+            ? strtoupper($validated['sku'])
+            : ($item->sku ?: $this->generateSku($validated['category'] ?? null, $validated['year']));
+        $validated['batch'] = !empty($validated['batch'])
+            ? strtoupper($validated['batch'])
+            : ($item->batch ?: $this->generateBatch($validated['year']));
 
         $item->update($validated);
         return response()->json($item);
