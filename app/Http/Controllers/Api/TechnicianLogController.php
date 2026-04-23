@@ -82,8 +82,10 @@ class TechnicianLogController extends Controller
             throw new AuthorizationException('Only administrators can delete employee logs.');
         }
 
-        $snapshot = $technicianLog->replicate();
-        $snapshot->id = $technicianLog->id;
+        $snapshot = $technicianLog
+            ->load('employee:id,employee_no,first_name,last_name,position,division,department,work_location,email')
+            ->toArray();
+
         $technicianLog->delete();
         broadcast(new TechnicianLogUpdated($snapshot, 'deleted'))->toOthers();
 

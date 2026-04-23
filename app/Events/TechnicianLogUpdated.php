@@ -5,18 +5,17 @@ namespace App\Events;
 use App\Models\TechnicianLog;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
-use Illuminate\Queue\SerializesModels;
 
 class TechnicianLogUpdated implements ShouldBroadcastNow
 {
-    use SerializesModels;
-
     public $technicianLog;
     public $type;
 
-    public function __construct(TechnicianLog $technicianLog, string $type = 'updated')
+    public function __construct(TechnicianLog|array $technicianLog, string $type = 'updated')
     {
-        $this->technicianLog = $technicianLog;
+        $this->technicianLog = $technicianLog instanceof TechnicianLog
+            ? $technicianLog->toArray()
+            : $technicianLog;
         $this->type = $type;
     }
 
