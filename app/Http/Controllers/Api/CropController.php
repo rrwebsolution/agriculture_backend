@@ -33,7 +33,7 @@ class CropController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'category' => 'required|string|max:255',
+            'category' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('crops', 'category')],
             'remarks'  => 'required|string',
         ]);
 
@@ -57,7 +57,7 @@ class CropController extends Controller
     $crop = Crop::findOrFail($id);
 
     $validatedData = $request->validate([
-        'category' => 'required|string|max:255',
+        'category' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('crops', 'category')->ignore($crop->id)],
         'remarks'  => 'required|string',
     ]);
 

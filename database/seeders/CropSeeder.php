@@ -26,9 +26,10 @@ class CropSeeder extends Seeder
         ];
 
         foreach ($categories as $category) {
-            Crop::create([
+            Crop::updateOrCreate([
                 'category' => $category,
-                // Farmers field removed (calculated dynamically via relationship)
+            ], [
+                'category' => $category,
                 'remarks' => 'Standard agricultural zone for ' . $category . '.'
             ]);
         }

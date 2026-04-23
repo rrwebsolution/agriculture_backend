@@ -11,16 +11,15 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Find the ID dynamically
         $adminRole = Role::where('name', 'System Administrator')->first();
 
-        User::create([
-            'name' => 'Ryan Reyes',
+        User::updateOrCreate([
             'email' => 'ryan@example.com',
+        ], [
+            'name' => 'Ryan Reyes',
             'password' => Hash::make('@password123'),
-            'cluster_id' => 1, // Assuming Cluster ID 1 exists
-            // Use the ID from the database, fallback to 1 if not found
-            'role_id' => $adminRole ? $adminRole->id : 1, 
+            'cluster_id' => 1,
+            'role_id' => $adminRole ? $adminRole->id : 1,
             'status' => 'active',
         ]);
     }
