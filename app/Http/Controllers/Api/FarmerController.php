@@ -117,6 +117,8 @@ class FarmerController extends Controller
             $data['topography'] = $firstFarm['topography'] ?? null;
             $data['irrigation_type'] = $firstFarm['irrigation_type'] ?? null;
             $data['farm_coordinates'] = $firstFarm['farm_coordinates'] ?? null;
+            $data['soil_type'] = $firstFarm['soil_type'] ?? null;
+            $data['gpx_file_path'] = $firstFarm['gpx_file_name'] ?? null;
         }
 
         if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
@@ -163,6 +165,8 @@ class FarmerController extends Controller
             $data['topography'] = $firstFarm['topography'] ?? null;
             $data['irrigation_type'] = $firstFarm['irrigation_type'] ?? null;
             $data['farm_coordinates'] = $firstFarm['farm_coordinates'] ?? null;
+            $data['soil_type'] = $firstFarm['soil_type'] ?? null;
+            $data['gpx_file_path'] = $firstFarm['gpx_file_name'] ?? null;
         }
 
         if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {

@@ -22,6 +22,10 @@
   .footer { margin-top: 24px; font-size: 9px; color: #888; }
   .no-data { text-align: center; padding: 24px; color: #888; font-style: italic; }
   .summary { margin-top: 10px; font-size: 9px; color: #555; }
+  .summary-grid { margin-top: 12px; width: 100%; }
+  .summary-grid td { border: 1px solid #d1d5db; padding: 8px; background: #f8fafc; }
+  .summary-label { font-size: 8px; text-transform: uppercase; color: #6b7280; }
+  .summary-value { font-size: 14px; font-weight: bold; color: #2D6A4F; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -39,6 +43,23 @@
     <div class="meta" style="margin-top:4px; font-style:italic;">Notes: {{ $report->notes }}</div>
     @endif
   </div>
+
+  @if(isset($data['summary']))
+    <table class="summary-grid">
+      <tbody>
+        <tr>
+          <td>
+            <div class="summary-label">Male Count</div>
+            <div class="summary-value">{{ $data['summary']['male_count'] ?? 0 }}</div>
+          </td>
+          <td>
+            <div class="summary-label">Female Count</div>
+            <div class="summary-value">{{ $data['summary']['female_count'] ?? 0 }}</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  @endif
 
   @if(empty($data['rows']))
     <div class="no-data">No records found for the selected period.</div>

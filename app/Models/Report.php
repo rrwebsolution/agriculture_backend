@@ -21,11 +21,15 @@ class Report extends Model
         'status',
         'notes',
         'file_path',
+        'filters',
+        'selected_fields',
     ];
 
     protected $casts = [
         'period_from' => 'date:Y-m-d',
         'period_to' => 'date:Y-m-d',
         'generated_at' => 'datetime',
+        'filters' => 'array',
+        'selected_fields' => 'array',
     ];
 }

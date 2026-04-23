@@ -13,7 +13,7 @@ class Farmer extends Model
         'system_id', 'rsbsa_no', 'first_name', 'middle_name', 'last_name', 'suffix',
         'gender', 'dob', 'barangay_id', 'address_details', 'contact_no',
         'farm_barangay_id', 'farm_sitio', 'crop_id', 'ownership_type', 
-        'total_area', 'farm_coordinates', 
+        'total_area', 'farm_coordinates', 'soil_type', 'gpx_file_path',
         'topography', 'irrigation_type', 'area_breakdown',
         'is_main_livelihood', 'is_coop_member', 'cooperative_id',
         'program_name', 'assistance_type', 'date_released', 

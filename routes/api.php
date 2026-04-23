@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ClusterController;
 use App\Http\Controllers\Api\CooperativeController;
 use App\Http\Controllers\Api\CropController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FarmerController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\PlantingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\TechnicianLogController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -69,6 +71,9 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
 
     Route::apiResource('expenses', ExpenseController::class);
     Route::post('expenses/{id}/restore', [ExpenseController::class, 'restore']);
+    Route::get('employees/org-chart', [EmployeeController::class, 'orgChart']);
+    Route::apiResource('employees', EmployeeController::class);
+    Route::apiResource('technician-logs', TechnicianLogController::class);
 
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);    // GET    /api/reports

@@ -6,6 +6,7 @@ use App\Exports\ReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\Farmer;
+use App\Models\Fisherfolk;
 use App\Models\FisheryRecord;
 use App\Models\Harvest;
 use App\Models\Inventory;
@@ -19,6 +20,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
+    private ?Report $currentReport = null;
+    private array $currentReportFilters = [];
+
     public function index()
     {
         $reports = Report::latest('generated_at')->get();
@@ -38,14 +42,15 @@ class ReportController extends Controller
             'period_from' => 'required|date',
             'period_to' => 'required|date|after_or_equal:period_from',
             'format' => ['required', Rule::in(['PDF', 'XLSX'])],
-            'status' => ['nullable', Rule::in(['Published', 'Pending Review', 'Draft'])],
+            'status' => ['required', Rule::in(['Published', 'Pending Review', 'Draft'])],
             'notes' => 'nullable|string|max:2000',
+            'filters' => 'nullable|array',
+            'selected_fields' => 'nullable|array|min:1',
+            'selected_fields.*' => 'string|max:255',
         ]);
 
         $validated['generated_by'] = Auth::user()->name ?? 'System';
         $validated['generated_at'] = now();
-        $validated['status'] = $validated['status'] ?? 'Published';
-
         $report = Report::create($validated);
 
         try {
@@ -125,14 +130,17 @@ class ReportController extends Controller
 
     private function fetchReportData(Report $report): array
     {
+        $this->currentReport = $report;
+        $this->currentReportFilters = $this->normalizeFilters($report->filters);
+
         return match ($report->type) {
+            default => $this->fetchByModule($report),
             'Production' => $this->fetchProduction($report->period_from, $report->period_to),
             'Fishery' => $this->fetchFishery($report->period_from, $report->period_to),
             'Livestock & Poultry' => $this->fetchLivestock(),
             'Financial' => $this->fetchFinancial($report->period_from, $report->period_to),
             'Census' => $this->fetchCensus(),
             'Inventory' => $this->fetchInventory(),
-            default => ['headers' => [], 'rows' => []],
         };
     }
 
@@ -180,114 +188,309 @@ class ReportController extends Controller
 
     private function fetchProduction($from, $to): array
     {
+        $filters = $this->currentReportFilters;
         $harvests = Harvest::with(['farmer', 'barangay', 'crop'])
             ->whereBetween('dateHarvested', [$from, $to])
+            ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
+            ->when(isset($filters['farmer_id']), fn ($query) => $query->where('farmer_id', $filters['farmer_id']))
+            ->when(isset($filters['quality']), fn ($query) => $query->where('quality', $filters['quality']))
             ->orderBy('dateHarvested')
             ->get();
 
-        $headers = ['Farmer', 'Crop', 'Barangay', 'Date Harvested', 'Quantity', 'Quality', 'Value (PHP)'];
-        $rows = $harvests->map(fn ($h) => [
-            $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Unknown Farmer'),
-            $this->textValue($h->crop->name ?? $h->crop->category ?? null, 'Unknown Crop'),
-            $this->textValue($h->barangay->name ?? null, 'Unknown Barangay'),
-            $this->dateValue($h->dateHarvested, 'Unknown Date'),
-            $this->measurementValue($h->quantity),
-            $this->textValue($h->quality, 'Unspecified'),
-            $this->numberValue($h->value),
-        ])->toArray();
+        $availableFields = [
+            'farmer' => 'Farmer',
+            'crop' => 'Crop',
+            'barangay' => 'Barangay',
+            'date_harvested' => 'Date Harvested',
+            'quantity' => 'Quantity',
+            'quality' => 'Quality',
+            'value' => 'Value (PHP)',
+        ];
 
-        return compact('headers', 'rows');
+        return $this->buildRows(
+            $availableFields,
+            $harvests,
+            fn ($h, $field) => match ($field) {
+                'farmer' => $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Unknown Farmer'),
+                'crop' => $this->textValue($h->crop->name ?? $h->crop->category ?? null, 'Unknown Crop'),
+                'barangay' => $this->textValue($h->barangay->name ?? null, 'Unknown Barangay'),
+                'date_harvested' => $this->dateValue($h->dateHarvested, 'Unknown Date'),
+                'quantity' => $this->measurementValue($h->quantity),
+                'quality' => $this->textValue($h->quality, 'Unspecified'),
+                'value' => $this->numberValue($h->value),
+                default => '',
+            }
+        );
     }
 
     private function fetchFishery($from, $to): array
     {
+        $filters = $this->currentReportFilters;
         $records = FisheryRecord::whereBetween('date', [$from, $to])
+            ->when(isset($filters['fishr_id']), fn ($query) => $query->where('fishr_id', $filters['fishr_id']))
+            ->when(isset($filters['gear_type']), fn ($query) => $query->where('gear_type', $filters['gear_type']))
+            ->when(isset($filters['fishing_area']), fn ($query) => $query->where('fishing_area', 'like', '%' . $filters['fishing_area'] . '%'))
             ->orderBy('date')
             ->get();
 
-        $headers = ['Name', 'Boat', 'Gear Type', 'Fishing Area', 'Species', 'Yield (kg)', 'Market Value (PHP)', 'Date'];
-        $rows = $records->map(fn ($r) => [
-            $this->textValue($r->name, 'Unknown Fisherfolk'),
-            $this->textValue($r->boat_name, 'No Boat Listed'),
-            $this->textValue($r->gear_type, 'Unspecified'),
-            $this->textValue($r->fishing_area, 'Unspecified'),
-            $this->textValue($r->catch_species, 'Unspecified'),
-            $this->measurementValue($r->yield, 'kg', '0.00 kg'),
-            $this->numberValue($r->market_value),
-            $this->dateValue($r->date, 'Unknown Date'),
-        ])->toArray();
+        $availableFields = [
+            'name' => 'Name',
+            'boat_name' => 'Boat',
+            'gear_type' => 'Gear Type',
+            'fishing_area' => 'Fishing Area',
+            'catch_species' => 'Species',
+            'yield' => 'Yield (kg)',
+            'market_value' => 'Market Value (PHP)',
+            'hours_spent_fishing' => 'Hours Spent Fishing',
+            'date' => 'Date',
+        ];
 
-        return compact('headers', 'rows');
+        return $this->buildRows(
+            $availableFields,
+            $records,
+            fn ($r, $field) => match ($field) {
+                'name' => $this->textValue($r->name, 'Unknown Fisherfolk'),
+                'boat_name' => $this->textValue($r->boat_name, 'No Boat Listed'),
+                'gear_type' => $this->textValue($r->gear_type, 'Unspecified'),
+                'fishing_area' => $this->textValue($r->fishing_area, 'Unspecified'),
+                'catch_species' => $this->textValue($r->catch_species, 'Unspecified'),
+                'yield' => $this->measurementValue($r->yield, 'kg', '0.00 kg'),
+                'market_value' => $this->numberValue($r->market_value),
+                'hours_spent_fishing' => $this->measurementValue($r->hours_spent_fishing, 'hrs', '0.00 hrs'),
+                'date' => $this->dateValue($r->date, 'Unknown Date'),
+                default => '',
+            }
+        );
     }
 
     private function fetchLivestock(): array
     {
-        $headers = ['Note'];
-        $rows = [['Livestock & Poultry module data is not yet available.']];
-
-        return compact('headers', 'rows');
+        return [
+            'headers' => ['Note'],
+            'rows' => [['Livestock & Poultry module data is not yet available.']],
+        ];
     }
 
     private function fetchFinancial($from, $to): array
     {
+        $filters = $this->currentReportFilters;
         $expenses = Expense::whereBetween('date_incurred', [$from, $to])
+            ->when(isset($filters['category']), fn ($query) => $query->where('category', $filters['category']))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['project']), fn ($query) => $query->where('project', 'like', '%' . $filters['project'] . '%'))
             ->orderBy('date_incurred')
             ->get();
 
-        $headers = ['Ref No.', 'Item', 'Category', 'Project', 'Amount (PHP)', 'Date', 'Status', 'Remarks'];
-        $rows = $expenses->map(fn ($e) => [
-            $this->textValue($e->ref_no, 'No Reference'),
-            $this->textValue($e->item, 'Unnamed Expense'),
-            $this->textValue($e->category, 'Uncategorized'),
-            $this->textValue($e->project, 'Unassigned Project'),
-            $this->numberValue($e->amount),
-            $this->dateValue($e->date_incurred, 'Unknown Date'),
-            $this->textValue($e->status, 'Unspecified'),
-            $this->textValue($e->remarks, 'No Remarks'),
-        ])->toArray();
+        $availableFields = [
+            'ref_no' => 'Ref No.',
+            'item' => 'Item',
+            'category' => 'Category',
+            'project' => 'Project',
+            'amount' => 'Amount (PHP)',
+            'date_incurred' => 'Date',
+            'status' => 'Status',
+            'remarks' => 'Remarks',
+        ];
 
-        $total = $expenses->sum('amount');
+        $data = $this->buildRows(
+            $availableFields,
+            $expenses,
+            fn ($e, $field) => match ($field) {
+                'ref_no' => $this->textValue($e->ref_no, 'No Reference'),
+                'item' => $this->textValue($e->item, 'Unnamed Expense'),
+                'category' => $this->textValue($e->category, 'Uncategorized'),
+                'project' => $this->textValue($e->project, 'Unassigned Project'),
+                'amount' => $this->numberValue($e->amount),
+                'date_incurred' => $this->dateValue($e->date_incurred, 'Unknown Date'),
+                'status' => $this->textValue($e->status, 'Unspecified'),
+                'remarks' => $this->textValue($e->remarks, 'No Remarks'),
+                default => '',
+            }
+        );
 
-        return compact('headers', 'rows', 'total');
+        $data['total'] = $expenses->sum('amount');
+
+        return $data;
     }
 
     private function fetchCensus(): array
     {
+        if ($this->currentReport?->module === 'Fisherfolk Registry') {
+            return $this->fetchFisherfolkRegistry();
+        }
+
+        $filters = $this->currentReportFilters;
         $farmers = Farmer::with(['barangay', 'crop'])
+            ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
+            ->when(isset($filters['gender']), fn ($query) => $query->where('gender', $filters['gender']))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['is_main_livelihood']), fn ($query) => $query->where('is_main_livelihood', filter_var($filters['is_main_livelihood'], FILTER_VALIDATE_BOOLEAN)))
             ->orderBy('last_name')
             ->get();
 
-        $headers = ['Full Name', 'Gender', 'Barangay', 'Contact No.', 'Primary Crop', 'Farm Area (ha)', 'Ownership', 'Status'];
-        $rows = $farmers->map(fn ($f) => [
-            $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Farmer'),
-            $this->textValue($f->gender, 'Unspecified'),
-            $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
-            $this->textValue($f->contact_no, 'No Contact'),
-            $this->textValue($f->crop->name ?? $f->crop->category ?? null, 'Unknown Crop'),
-            $this->numberValue($f->total_area),
-            $this->textValue($f->ownership_type, 'Unspecified'),
-            $this->textValue($f->status, 'Unspecified'),
-        ])->toArray();
+        $availableFields = [
+            'full_name' => 'Full Name',
+            'gender' => 'Sex',
+            'barangay' => 'Barangay',
+            'contact_no' => 'Contact No.',
+            'primary_crop' => 'Primary Crop',
+            'farm_area' => 'Farm Area (ha)',
+            'ownership' => 'Ownership',
+            'soil_type' => 'Soil Type',
+            'status' => 'Status',
+        ];
 
-        return compact('headers', 'rows');
+        $data = $this->buildRows(
+            $availableFields,
+            $farmers,
+            fn ($f, $field) => match ($field) {
+                'full_name' => $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Farmer'),
+                'gender' => $this->textValue($f->gender, 'Unspecified'),
+                'barangay' => $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
+                'contact_no' => $this->textValue($f->contact_no, 'No Contact'),
+                'primary_crop' => $this->textValue($f->crop->name ?? $f->crop->category ?? null, 'Unknown Crop'),
+                'farm_area' => $this->numberValue($f->total_area),
+                'ownership' => $this->textValue($f->ownership_type, 'Unspecified'),
+                'soil_type' => $this->textValue($f->soil_type, 'Unspecified'),
+                'status' => $this->textValue($f->status, 'Unspecified'),
+                default => '',
+            }
+        );
+
+        $data['summary'] = $this->sexSummary($farmers);
+
+        return $data;
+    }
+
+    private function fetchFisherfolkRegistry(): array
+    {
+        $filters = $this->currentReportFilters;
+        $fisherfolks = Fisherfolk::with('barangay')
+            ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['gender']), fn ($query) => $query->where('gender', $filters['gender']))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['fisher_type']), fn ($query) => $query->where('fisher_type', 'like', '%' . $filters['fisher_type'] . '%'))
+            ->orderBy('last_name')
+            ->get();
+
+        $availableFields = [
+            'full_name' => 'Full Name',
+            'gender' => 'Sex',
+            'barangay' => 'Barangay',
+            'contact_no' => 'Contact No.',
+            'fisher_type' => 'Fisher Type',
+            'years_in_fishing' => 'Years in Fishing',
+            'status' => 'Status',
+        ];
+
+        $data = $this->buildRows(
+            $availableFields,
+            $fisherfolks,
+            fn ($f, $field) => match ($field) {
+                'full_name' => $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Fisherfolk'),
+                'gender' => $this->textValue($f->gender, 'Unspecified'),
+                'barangay' => $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
+                'contact_no' => $this->textValue($f->contact_no, 'No Contact'),
+                'fisher_type' => $this->textValue($f->fisher_type, 'Unspecified'),
+                'years_in_fishing' => $this->measurementValue($f->years_in_fishing, 'yrs', '0.00 yrs'),
+                'status' => $this->textValue($f->status, 'Unspecified'),
+                default => '',
+            }
+        );
+
+        $data['summary'] = $this->sexSummary($fisherfolks);
+
+        return $data;
     }
 
     private function fetchInventory(): array
     {
-        $items = Inventory::orderBy('name')->get();
+        $filters = $this->currentReportFilters;
+        $items = Inventory::orderBy('name')
+            ->when(isset($filters['category']), fn ($query) => $query->where('category', $filters['category']))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['commodity']), fn ($query) => $query->where('commodity', 'like', '%' . $filters['commodity'] . '%'))
+            ->when(isset($filters['year']), fn ($query) => $query->where('year', $filters['year']))
+            ->get();
 
-        $headers = ['Item Name', 'Commodity', 'Category', 'SKU', 'Stock', 'Unit', 'Status', 'Year'];
-        $rows = $items->map(fn ($i) => [
-            $this->textValue($i->name, 'Unnamed Item'),
-            $this->textValue($i->commodity, 'Unspecified'),
-            $this->textValue($i->category, 'Uncategorized'),
-            $this->textValue($i->sku, 'No SKU'),
-            $this->numberValue($i->stock),
-            $this->textValue($i->unit, 'Unspecified'),
-            $this->textValue($i->status, 'Unspecified'),
-            $this->textValue($i->year, 'Unknown Year'),
-        ])->toArray();
+        $availableFields = [
+            'name' => 'Item Name',
+            'commodity' => 'Commodity',
+            'category' => 'Category',
+            'sku' => 'SKU',
+            'stock' => 'Stock',
+            'unit' => 'Unit',
+            'status' => 'Status',
+            'year' => 'Year',
+        ];
+
+        return $this->buildRows(
+            $availableFields,
+            $items,
+            fn ($i, $field) => match ($field) {
+                'name' => $this->textValue($i->name, 'Unnamed Item'),
+                'commodity' => $this->textValue($i->commodity, 'Unspecified'),
+                'category' => $this->textValue($i->category, 'Uncategorized'),
+                'sku' => $this->textValue($i->sku, 'No SKU'),
+                'stock' => $this->numberValue($i->stock),
+                'unit' => $this->textValue($i->unit, 'Unspecified'),
+                'status' => $this->textValue($i->status, 'Unspecified'),
+                'year' => $this->textValue($i->year, 'Unknown Year'),
+                default => '',
+            }
+        );
+    }
+
+    private function normalizeFilters(?array $filters): array
+    {
+        return collect($filters ?? [])
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->all();
+    }
+
+    private function selectedFields(array $availableFields): array
+    {
+        if (!$this->currentReport || empty($this->currentReport->selected_fields)) {
+            return array_keys($availableFields);
+        }
+
+        $selected = array_values(array_filter(
+            $this->currentReport->selected_fields,
+            fn ($field) => array_key_exists($field, $availableFields)
+        ));
+
+        return empty($selected) ? array_keys($availableFields) : $selected;
+    }
+
+    private function buildRows(array $availableFields, iterable $items, callable $resolver): array
+    {
+        $selectedFields = $this->selectedFields($availableFields);
+        $headers = array_map(fn ($field) => $availableFields[$field], $selectedFields);
+        $rows = collect($items)->map(function ($item) use ($selectedFields, $resolver) {
+            return array_map(fn ($field) => $resolver($item, $field), $selectedFields);
+        })->toArray();
 
         return compact('headers', 'rows');
+    }
+
+    private function fetchByModule(Report $report): array
+    {
+        return match ($report->module) {
+            'Farmer Registry' => $this->fetchCensus(),
+            'Fisherfolk Registry' => $this->fetchFisherfolkRegistry(),
+            default => ['headers' => [], 'rows' => []],
+        };
+    }
+
+    private function sexSummary(iterable $items): array
+    {
+        $collection = collect($items);
+
+        return [
+            'male_count' => $collection->filter(fn ($item) => strcasecmp((string) ($item->gender ?? ''), 'Male') === 0)->count(),
+            'female_count' => $collection->filter(fn ($item) => strcasecmp((string) ($item->gender ?? ''), 'Female') === 0)->count(),
+        ];
     }
 }

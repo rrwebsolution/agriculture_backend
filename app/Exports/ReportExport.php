@@ -23,6 +23,15 @@ class ReportExport implements FromArray, WithColumnWidths, WithHeadings, WithSty
     {
         $rows = $this->data['rows'] ?? [];
 
+        if (isset($this->data['summary'])) {
+            array_unshift(
+                $rows,
+                ['Male Count', $this->data['summary']['male_count'] ?? 0],
+                ['Female Count', $this->data['summary']['female_count'] ?? 0],
+                []
+            );
+        }
+
         if ($this->report->type === 'Financial' && isset($this->data['total'])) {
             $rows[] = [];
             $rows[] = ['', '', '', 'TOTAL', '₱ '.number_format($this->data['total'], 2)];
