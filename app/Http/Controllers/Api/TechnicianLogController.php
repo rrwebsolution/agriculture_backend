@@ -43,7 +43,7 @@ class TechnicianLogController extends Controller
         $this->enforceFaceVerification($validated);
         $this->preventDuplicateMovement($validated);
         $log = TechnicianLog::create($validated)->load('employee:id,employee_no,first_name,last_name,position,division,department,work_location,email');
-        broadcast(new TechnicianLogUpdated($log, 'created'))->toOthers();
+        $this->broadcastTechnicianLogUpdate($log, 'created');
 
         return response()->json(['data' => $log, 'message' => 'Technician log created successfully.'], 201);
     }
@@ -66,7 +66,7 @@ class TechnicianLogController extends Controller
         $this->preventDuplicateMovement($validated, $technicianLog->id);
         $technicianLog->update($validated);
         $freshLog = $technicianLog->fresh('employee:id,employee_no,first_name,last_name,position,division,department,work_location,email');
-        broadcast(new TechnicianLogUpdated($freshLog, 'updated'))->toOthers();
+        $this->broadcastTechnicianLogUpdate($freshLog, 'updated');
 
         return response()->json([
             'data' => $freshLog,
@@ -88,9 +88,18 @@ class TechnicianLogController extends Controller
             ->toArray();
 
         $technicianLog->delete();
-        broadcast(new TechnicianLogUpdated($snapshot, 'deleted'))->toOthers();
+        $this->broadcastTechnicianLogUpdate($snapshot, 'deleted');
 
         return response()->json(['message' => 'Technician log deleted successfully.']);
+    }
+
+    private function broadcastTechnicianLogUpdate(TechnicianLog|array $technicianLog, string $type): void
+    {
+        try {
+            broadcast(new TechnicianLogUpdated($technicianLog, $type))->toOthers();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function validateRequest(Request $request, ?TechnicianLog $existingLog = null): array

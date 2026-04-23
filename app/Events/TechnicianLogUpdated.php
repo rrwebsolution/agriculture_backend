@@ -19,6 +19,27 @@ class TechnicianLogUpdated implements ShouldBroadcastNow
         $this->type = $type;
     }
 
+    private function sanitizeTechnicianLogPayload(array $technicianLog): array
+    {
+        unset($technicianLog['verification_photo']);
+
+        if (isset($technicianLog['employee']) && is_array($technicianLog['employee'])) {
+            $technicianLog['employee'] = array_intersect_key($technicianLog['employee'], array_flip([
+                'id',
+                'employee_no',
+                'first_name',
+                'last_name',
+                'position',
+                'division',
+                'department',
+                'work_location',
+                'email',
+            ]));
+        }
+
+        return $technicianLog;
+    }
+
     public function broadcastOn(): Channel
     {
         return new Channel('technician-logs-channel');
@@ -32,7 +53,7 @@ class TechnicianLogUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'technicianLog' => $this->technicianLog,
+            'technicianLog' => $this->sanitizeTechnicianLogPayload($this->technicianLog),
             'type' => $this->type,
         ];
     }
