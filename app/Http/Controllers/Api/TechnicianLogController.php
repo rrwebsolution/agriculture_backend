@@ -76,7 +76,12 @@ class TechnicianLogController extends Controller
 
     public function destroy(Request $request, TechnicianLog $technicianLog)
     {
-        $this->authorizeLogAccess($request->user()?->loadMissing('role'), $technicianLog);
+        $user = $request->user()?->loadMissing('role');
+
+        if (!$this->isAdminUser($user)) {
+            throw new AuthorizationException('Only administrators can delete employee logs.');
+        }
+
         $snapshot = $technicianLog->replicate();
         $snapshot->id = $technicianLog->id;
         $technicianLog->delete();
