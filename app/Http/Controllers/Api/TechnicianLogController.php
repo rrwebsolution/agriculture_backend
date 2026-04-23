@@ -77,9 +77,10 @@ class TechnicianLogController extends Controller
     public function destroy(Request $request, TechnicianLog $technicianLog)
     {
         $user = $request->user()?->loadMissing('role');
+        $isOwner = (int) $technicianLog->employee_id === (int) $this->resolveEmployeeForUser($user)?->id;
 
-        if (!$this->isAdminUser($user)) {
-            throw new AuthorizationException('Only administrators can delete employee logs.');
+        if (!$this->isAdminUser($user) && !($this->canManageTechnicianLogs($user) && $isOwner)) {
+            throw new AuthorizationException('You are not allowed to delete this employee log.');
         }
 
         $snapshot = $technicianLog
@@ -181,6 +182,17 @@ class TechnicianLogController extends Controller
     private function isAdminUser(?User $user): bool
     {
         return in_array($user?->role?->name, ['Administrator', 'System Administrator', 'pageistrator'], true);
+    }
+
+    private function canManageTechnicianLogs(?User $user): bool
+    {
+        $permissions = $user?->role?->permissions;
+
+        if (!is_array($permissions)) {
+            return false;
+        }
+
+        return in_array('Administration: Manage Technician Logs', $permissions, true);
     }
 
     private function preventDuplicateMovement(array $validated, ?int $ignoreId = null): void
