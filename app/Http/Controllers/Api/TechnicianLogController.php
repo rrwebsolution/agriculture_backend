@@ -178,7 +178,7 @@ class TechnicianLogController extends Controller
 
     private function preventDuplicateMovement(array $validated, ?int $ignoreId = null): void
     {
-        $duplicateWindowMinutes = 10;
+        $duplicateWindowMinutes = 5;
 
         $duplicateQuery = TechnicianLog::query()
             ->where('employee_id', $validated['employee_id'])
@@ -194,7 +194,7 @@ class TechnicianLogController extends Controller
 
         if ($duplicateQuery->exists()) {
             throw ValidationException::withMessages([
-                'duplicate_log' => 'A similar technician movement log was already recorded within the last 10 minutes.',
+                'duplicate_log' => 'A similar technician movement log was already recorded within the last 5 minutes. Please try again after 5 minutes.',
             ]);
         }
     }
