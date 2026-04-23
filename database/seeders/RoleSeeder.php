@@ -59,6 +59,7 @@ class RoleSeeder extends Seeder
                     "Finance: View Expenses",
                     "Finance: Manage Expenses",
                     "Finance: View Financial Reports",
+                    "Finance: Manage Financial Reports",
                     
                     // Access Control
                     "Access Control: View Roles",
