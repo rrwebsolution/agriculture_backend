@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ClusterController;
 use App\Http\Controllers\Api\CooperativeController;
 use App\Http\Controllers\Api\CropController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DangerZoneController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EquipmentController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -41,6 +42,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::get('/users', [UserController::class, 'getUserData']);
     Route::post('/users-store', [UserController::class, 'store']);
     Route::put('/users-update/{id}', [UserController::class, 'update']);
+    Route::post('/users-reset-password/{id}', [UserController::class, 'resetPassword']);
     Route::delete('/users-delete/{id}', [UserController::class, 'destroy']);
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/roles', [RoleController::class, 'store']);
@@ -51,6 +53,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
 
     Route::apiResource('farmers', FarmerController::class);
     Route::apiResource('barangays', BarangayController::class);
+    Route::apiResource('danger-zones', DangerZoneController::class);
     Route::apiResource('fishery', FisheryController::class);
     Route::apiResource('crops', CropController::class);
     Route::apiResource('cooperatives', CooperativeController::class);

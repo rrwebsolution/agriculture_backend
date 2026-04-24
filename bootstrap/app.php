@@ -66,6 +66,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/employees/*',
             'api/technician-logs',
             'api/technician-logs/*',
+            'api/technicians',
+            'api/technicians/*',
+            'api/users-reset-password/*',
+            'api/danger-zones',
+            'api/danger-zones/*',
+
 
 
         ]);

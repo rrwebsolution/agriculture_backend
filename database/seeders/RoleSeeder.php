@@ -34,6 +34,10 @@ class RoleSeeder extends Seeder
                     "Locations: Manage Barangay List",
                     "Locations: View Clusters",
                     "Locations: Manage Clusters",
+                    "Locations: View Work Locations",
+                    "Locations: Manage Work Locations",
+                    "Locations: View Danger Zones",
+                    "Locations: Manage Danger Zones",
                     
                     // Production (Crop Agriculture)
                     "Production: View Crops",
@@ -60,6 +64,13 @@ class RoleSeeder extends Seeder
                     "Finance: Manage Expenses",
                     "Finance: View Financial Reports",
                     "Finance: Manage Financial Reports",
+
+                    // Administration
+                    "Administration: View Employees",
+                    "Administration: Manage Employees",
+                    "Administration: View Employee Logs",
+                    "Administration: Manage Employee Logs",
+                    "Administration: View Employee Log Details",
                     
                     // Access Control
                     "Access Control: View Roles",

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cluster;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -22,6 +24,7 @@ class EmployeeController extends Controller
     {
         $validated = $this->validateRequest($request);
         $employee = Employee::create($validated)->load(['supervisor:id,first_name,last_name,position', 'subordinates:id,supervisor_id']);
+        $this->syncLinkedUserCluster($employee);
 
         return response()->json(['data' => $employee, 'message' => 'Employee created successfully.'], 201);
     }
@@ -39,11 +42,14 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        $previousEmail = $employee->email;
         $validated = $this->validateRequest($request, $employee->id);
         $employee->update($validated);
+        $employee = $employee->fresh(['supervisor:id,first_name,last_name,position', 'subordinates:id,supervisor_id']);
+        $this->syncLinkedUserCluster($employee, $previousEmail);
 
         return response()->json([
-            'data' => $employee->fresh(['supervisor:id,first_name,last_name,position', 'subordinates:id,supervisor_id']),
+            'data' => $employee,
             'message' => 'Employee updated successfully.',
         ]);
     }
@@ -97,5 +103,39 @@ class EmployeeController extends Controller
             'current_assignment' => 'nullable|string|max:255',
             'face_reference_image' => 'nullable|string',
         ]);
+    }
+
+    private function syncLinkedUserCluster(Employee $employee, ?string $previousEmail = null): void
+    {
+        $emailsToCheck = collect([
+            $employee->email,
+            $previousEmail,
+        ])->filter(fn ($email) => filled($email))
+          ->map(fn ($email) => strtolower(trim((string) $email)))
+          ->unique()
+          ->values();
+
+        if ($emailsToCheck->isEmpty()) {
+            return;
+        }
+
+        $clusterId = null;
+        $workLocation = trim((string) $employee->work_location);
+
+        if ($workLocation !== '') {
+            $clusterId = Cluster::query()
+                ->whereRaw('LOWER(name) = ?', [strtolower($workLocation)])
+                ->value('id');
+        }
+
+        User::query()
+            ->where(function ($query) use ($emailsToCheck) {
+                foreach ($emailsToCheck as $email) {
+                    $query->orWhereRaw('LOWER(email) = ?', [$email]);
+                }
+            })
+            ->update([
+                'cluster_id' => $clusterId,
+            ]);
     }
 }

@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
+    private function defaultPassword(): string
+    {
+        return 'Gingoog@' . now()->year;
+    }
+
     /**
      * Helper function para uniform ang format sa User Data
      */
@@ -54,7 +59,7 @@ class UserController extends Controller
         'email' => $request->email,
         'role_id' => $request->role,
         'cluster_id' => $request->cluster,
-        'password' => Hash::make('Gingoog@2026'),
+        'password' => Hash::make($this->defaultPassword()),
         'status' => 'active',
     ]);
 
@@ -112,6 +117,23 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->delete();
         return response()->json(['status' => 'success', 'message' => 'User deleted successfully!']);
+    }
+
+    public function resetPassword($id)
+    {
+        $user = User::findOrFail($id);
+        $defaultPassword = $this->defaultPassword();
+
+        $user->update([
+            'password' => Hash::make($defaultPassword),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Password reset successfully!',
+            'default_password' => $defaultPassword,
+            'data' => $this->formatUser($user->load(['role', 'cluster'])),
+        ]);
     }
 
     public function me(Request $request)
