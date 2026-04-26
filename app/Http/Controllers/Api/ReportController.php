@@ -10,8 +10,10 @@ use App\Models\Fisherfolk;
 use App\Models\FisheryRecord;
 use App\Models\Harvest;
 use App\Models\Inventory;
+use App\Models\Planting;
 use App\Models\Report;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +35,22 @@ class ReportController extends Controller
         ]);
     }
 
+    public function dateRange(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => ['required', Rule::in(['Production', 'Fishery', 'Livestock & Poultry', 'Financial', 'Census', 'Inventory'])],
+            'module' => 'required|string|max:255',
+        ]);
+
+        [$from, $to] = $this->resolveModuleDateRange($validated['type'], $validated['module']);
+
+        return response()->json([
+            'period_from' => $from,
+            'period_to' => $to,
+            'has_data' => (bool) ($from && $to),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -48,6 +66,31 @@ class ReportController extends Controller
             'selected_fields' => 'nullable|array|min:1',
             'selected_fields.*' => 'string|max:255',
         ]);
+
+        [$availableFrom, $availableTo] = $this->resolveModuleDateRange($validated['type'], $validated['module']);
+        if (!$availableFrom || !$availableTo) {
+            return response()->json([
+                'errors' => [
+                    'module' => 'No dated records available yet for the selected data module.',
+                ],
+            ], 422);
+        }
+
+        if ($validated['period_from'] < $availableFrom || $validated['period_from'] > $availableTo) {
+            return response()->json([
+                'errors' => [
+                    'period_from' => "Start date must be within available module dates ({$availableFrom} to {$availableTo}).",
+                ],
+            ], 422);
+        }
+
+        if ($validated['period_to'] < $availableFrom || $validated['period_to'] > $availableTo) {
+            return response()->json([
+                'errors' => [
+                    'period_to' => "End date must be within available module dates ({$availableFrom} to {$availableTo}).",
+                ],
+            ], 422);
+        }
 
         $validated['generated_by'] = Auth::user()->name ?? 'System';
         $validated['generated_at'] = now();
@@ -188,11 +231,17 @@ class ReportController extends Controller
 
     private function fetchProduction($from, $to): array
     {
+        if ($this->currentReport?->module === 'Planting Records') {
+            return $this->fetchPlanting($from, $to);
+        }
+
         $filters = $this->currentReportFilters;
         $harvests = Harvest::with(['farmer', 'barangay', 'crop'])
             ->whereBetween('dateHarvested', [$from, $to])
             ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
+            ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
             ->when(isset($filters['farmer_id']), fn ($query) => $query->where('farmer_id', $filters['farmer_id']))
             ->when(isset($filters['quality']), fn ($query) => $query->where('quality', $filters['quality']))
             ->orderBy('dateHarvested')
@@ -224,13 +273,67 @@ class ReportController extends Controller
         );
     }
 
+    private function fetchPlanting($from, $to): array
+    {
+        $filters = $this->currentReportFilters;
+        $records = Planting::with(['farmer', 'barangay', 'crop'])
+            ->whereBetween('date_planted', [$from, $to])
+            ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
+            ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
+            ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
+            ->when(isset($filters['growth_status']), fn ($query) => $query->where('status', $filters['growth_status']))
+            ->orderBy('date_planted')
+            ->get();
+
+        $availableFields = [
+            'farmer' => 'Farmer',
+            'crop_type' => 'Crop Type',
+            'growth_status' => 'Growth Status',
+            'barangay' => 'Barangay',
+            'date_planted' => 'Date Planted',
+            'area' => 'Area (ha)',
+        ];
+
+        return $this->buildRows(
+            $availableFields,
+            $records,
+            fn ($p, $field) => match ($field) {
+                'farmer' => $this->textValue(trim(($p->farmer->first_name ?? '') . ' ' . ($p->farmer->last_name ?? '')), 'Unknown Farmer'),
+                'crop_type' => $this->textValue($p->crop->category ?? null, 'Unknown Crop'),
+                'growth_status' => $this->textValue($p->status, 'Unspecified'),
+                'barangay' => $this->textValue($p->barangay->name ?? null, 'Unknown Barangay'),
+                'date_planted' => $this->dateValue($p->date_planted, 'Unknown Date'),
+                'area' => $this->measurementValue($p->area, 'ha', '0.00 ha'),
+                default => '',
+            }
+        );
+    }
+
     private function fetchFishery($from, $to): array
     {
         $filters = $this->currentReportFilters;
         $records = FisheryRecord::whereBetween('date', [$from, $to])
             ->when(isset($filters['fishr_id']), fn ($query) => $query->where('fishr_id', $filters['fishr_id']))
+            ->when(isset($filters['boat_type']), function ($query) use ($filters) {
+                $query->whereIn('fishr_id', function ($sub) use ($filters) {
+                    $sub->from('fisherfolks')
+                        ->select('system_id')
+                        ->where('boat_type', $filters['boat_type']);
+                });
+            })
             ->when(isset($filters['gear_type']), fn ($query) => $query->where('gear_type', $filters['gear_type']))
             ->when(isset($filters['fishing_area']), fn ($query) => $query->where('fishing_area', 'like', '%' . $filters['fishing_area'] . '%'))
+            ->when(isset($filters['catch_species']), fn ($query) => $query->where('catch_species', 'like', '%' . $filters['catch_species'] . '%'))
+            ->when(isset($filters['total_yield']), function ($query) use ($filters) {
+                [$min, $max] = $this->parseYieldRange($filters['total_yield']);
+                if ($min !== null) {
+                    $query->where('yield', '>=', $min);
+                }
+                if ($max !== null) {
+                    $query->where('yield', '<=', $max);
+                }
+            })
             ->orderBy('date')
             ->get();
 
@@ -316,6 +419,10 @@ class ReportController extends Controller
 
     private function fetchCensus(): array
     {
+        if ($this->currentReport?->module === 'Barangay Profile') {
+            return $this->fetchBarangayProfile();
+        }
+
         if ($this->currentReport?->module === 'Fisherfolk Registry') {
             return $this->fetchFisherfolkRegistry();
         }
@@ -323,7 +430,9 @@ class ReportController extends Controller
         $filters = $this->currentReportFilters;
         $farmers = Farmer::with(['barangay', 'crop'])
             ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
+            ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
             ->when(isset($filters['gender']), fn ($query) => $query->where('gender', $filters['gender']))
             ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
             ->when(isset($filters['is_main_livelihood']), fn ($query) => $query->where('is_main_livelihood', filter_var($filters['is_main_livelihood'], FILTER_VALIDATE_BOOLEAN)))
@@ -369,6 +478,7 @@ class ReportController extends Controller
         $filters = $this->currentReportFilters;
         $fisherfolks = Fisherfolk::with('barangay')
             ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
+            ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['gender']), fn ($query) => $query->where('gender', $filters['gender']))
             ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
             ->when(isset($filters['fisher_type']), fn ($query) => $query->where('fisher_type', 'like', '%' . $filters['fisher_type'] . '%'))
@@ -403,6 +513,39 @@ class ReportController extends Controller
         $data['summary'] = $this->sexSummary($fisherfolks);
 
         return $data;
+    }
+
+    private function fetchBarangayProfile(): array
+    {
+        $filters = $this->currentReportFilters;
+
+        $profiles = \App\Models\Barangay::query()
+            ->when(isset($filters['barangay']), fn ($query) => $query->where('name', $filters['barangay']))
+            ->orderBy('name')
+            ->get();
+
+        $availableFields = [
+            'barangay' => 'Barangay',
+            'population' => 'Population',
+            'households' => 'Households',
+            'primary_livelihood' => 'Primary Livelihood',
+            'registered_farmers' => 'Registered Farmers',
+            'registered_fisherfolk' => 'Registered Fisherfolk',
+        ];
+
+        return $this->buildRows(
+            $availableFields,
+            $profiles,
+            fn ($b, $field) => match ($field) {
+                'barangay' => $this->textValue($b->name, 'Unknown Barangay'),
+                'population' => $this->numberValue($b->population ?? 0, 0),
+                'households' => $this->numberValue($b->households ?? 0, 0),
+                'primary_livelihood' => $this->textValue($b->type, 'Not Available'),
+                'registered_farmers' => (string) Farmer::where('barangay_id', $b->id)->count(),
+                'registered_fisherfolk' => (string) Fisherfolk::where('barangay_id', $b->id)->count(),
+                default => '',
+            }
+        );
     }
 
     private function fetchInventory(): array
@@ -446,6 +589,14 @@ class ReportController extends Controller
     private function normalizeFilters(?array $filters): array
     {
         return collect($filters ?? [])
+            ->mapWithKeys(function ($value, $key) {
+                $normalizedKey = match ($key) {
+                    'crop_type' => 'crop',
+                    default => $key,
+                };
+
+                return [$normalizedKey => $value];
+            })
             ->filter(fn ($value) => $value !== null && $value !== '')
             ->all();
     }
@@ -478,10 +629,77 @@ class ReportController extends Controller
     private function fetchByModule(Report $report): array
     {
         return match ($report->module) {
+            'Harvest Records' => $this->fetchProduction($report->period_from, $report->period_to),
+            'Planting Records' => $this->fetchPlanting($report->period_from, $report->period_to),
+            'Fish Catch Data' => $this->fetchFishery($report->period_from, $report->period_to),
             'Farmer Registry' => $this->fetchCensus(),
             'Fisherfolk Registry' => $this->fetchFisherfolkRegistry(),
+            'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->fetchFinancial($report->period_from, $report->period_to),
+            'Barangay Profile' => $this->fetchBarangayProfile(),
             default => ['headers' => [], 'rows' => []],
         };
+    }
+
+    private function parseYieldRange(string $range): array
+    {
+        $normalized = trim($range);
+
+        return match ($normalized) {
+            '0-50 kg' => [0, 50],
+            '51-100 kg' => [51, 100],
+            '101-250 kg' => [101, 250],
+            '251-500 kg' => [251, 500],
+            '500+ kg' => [500, null],
+            default => [null, null],
+        };
+    }
+
+    private function resolveModuleDateRange(string $type, string $module): array
+    {
+        $byModule = match ($module) {
+            'Harvest Records' => $this->dateRangeFromModel(Harvest::query(), 'dateHarvested'),
+            'Planting Records' => $this->dateRangeFromModel(Planting::query(), 'date_planted'),
+            'Fish Catch Data' => $this->dateRangeFromModel(FisheryRecord::query(), 'date'),
+            'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
+            'Farmer Registry' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),
+            'Fisherfolk Registry' => $this->dateRangeFromModel(Fisherfolk::query(), 'created_at'),
+            'Barangay Profile' => $this->dateRangeFromModel(\App\Models\Barangay::query(), 'created_at'),
+            'Equipment Status', 'Supply Inventory', 'Distribution Records' => $this->dateRangeFromModel(Inventory::query(), 'created_at'),
+            default => [null, null],
+        };
+
+        if ($byModule[0] && $byModule[1]) {
+            return $byModule;
+        }
+
+        return match ($type) {
+            'Production' => $this->dateRangeFromModel(Harvest::query(), 'dateHarvested'),
+            'Fishery' => $this->dateRangeFromModel(FisheryRecord::query(), 'date'),
+            'Financial' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
+            'Census' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),
+            'Inventory' => $this->dateRangeFromModel(Inventory::query(), 'created_at'),
+            default => [null, null],
+        };
+    }
+
+    private function dateRangeFromModel($query, string $column): array
+    {
+        $from = (clone $query)->whereNotNull($column)->min($column);
+        $to = (clone $query)->whereNotNull($column)->max($column);
+
+        return [
+            $this->normalizeDateBoundary($from),
+            $this->normalizeDateBoundary($to),
+        ];
+    }
+
+    private function normalizeDateBoundary(mixed $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        return Carbon::parse($value)->format('Y-m-d');
     }
 
     private function sexSummary(iterable $items): array

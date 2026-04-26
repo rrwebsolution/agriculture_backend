@@ -80,6 +80,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
 
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);    // GET    /api/reports
+        Route::get('/date-range', [ReportController::class, 'dateRange']); // GET /api/reports/date-range?type=&module=
         Route::post('/', [ReportController::class, 'store']);    // POST   /api/reports
         Route::get('/{report}/download', [ReportController::class, 'download']); // GET    /api/reports/{id}/download
         Route::delete('/{report}', [ReportController::class, 'destroy']); // DELETE /api/reports/{id}
