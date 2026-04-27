@@ -32,9 +32,11 @@ class FarmerUpdated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $data = $this->farmer->toArray();
+        unset($data['plantings'], $data['harvests'], $data['assigned_cooperatives']);
+
         return [
-            // 🌟 Tungod kay nag-fresh() ta sa controller, ready na ipadala ang model
-            'farmer' => $this->farmer,
+            'farmer' => $data,
             'type' => $this->type,
         ];
     }

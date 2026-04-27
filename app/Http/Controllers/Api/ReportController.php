@@ -109,6 +109,18 @@ class ReportController extends Controller
         ], 201);
     }
 
+    public function preview(Report $report)
+    {
+        $data = $this->fetchReportData($report);
+
+        return response()->json([
+            'headers'  => $data['headers'] ?? [],
+            'rows'     => $data['rows']    ?? [],
+            'total'    => $data['total']   ?? null,
+            'summary'  => $data['summary'] ?? null,
+        ]);
+    }
+
     public function download(Report $report)
     {
         try {

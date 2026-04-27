@@ -15,11 +15,6 @@ class PlantingUpdated implements ShouldBroadcastNow
 
     public function __construct($planting, string $action = 'updated')
     {
-        // 🌟 I-ensure nato nga loaded ang relationships para kompleto ang data sa frontend
-        if (is_object($planting) && method_exists($planting, 'load')) {
-            $planting->load(['farmer', 'barangay', 'crop', 'statusHistory']);
-        }
-        
         $this->planting = $planting;
         $this->action = $action;
     }

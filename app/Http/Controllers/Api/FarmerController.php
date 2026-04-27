@@ -47,42 +47,25 @@ class FarmerController extends Controller
     private function syncRealtimeMetrics($crop_id, $barangay_id)
     {
         if ($crop_id) {
-            $c = Crop::withCount('registeredFarmers')->with([
-                'registeredFarmers' => function ($query) {
-                    $query->latest();
-                },
-                'registeredFarmers.barangay',
-                'registeredFarmers.farmLocation'
-            ])->find($crop_id);
+            $c = Crop::withCount('registeredFarmers')->find($crop_id);
 
             if ($c) {
                 $c->farmers = $c->registered_farmers_count;
-                $c->registered_farmers = $c->registeredFarmers;
                 event(new CropUpdated($c, 'updated'));
             }
         }
 
         if ($barangay_id) {
-            $b = Barangay::with([
-                'farmers.barangay',
-                'farmers.crop',
-                'farmers.farmLocation',
-                'fisherfolks.barangay',
-                'fisherfolks.catchRecords',
-                'cooperatives'
-            ])->findOrFail($barangay_id);
+            $b = Barangay::findOrFail($barangay_id);
 
             $formatted = [
-                'id' => $b->id,
-                'name' => $b->name,
-                'code' => $b->code,
-                'type' => $b->type,
-                'farmers' => $b->farmers->count(),
-                'fisherfolks' => $b->fisherfolks->count(),
-                'cooperatives_count' => $b->cooperatives->count(),
-                'farmersList' => $b->farmers,
-                'fisherfolksList' => $b->fisherfolks,
-                'cooperativesList' => $b->cooperatives
+                'id'                 => $b->id,
+                'name'               => $b->name,
+                'code'               => $b->code,
+                'type'               => $b->type,
+                'farmers'            => $b->farmers()->count(),
+                'fisherfolks'        => $b->fisherfolks()->count(),
+                'cooperatives_count' => $b->cooperatives()->count(),
             ];
 
             event(new BarangayUpdated($formatted, 'updated'));
@@ -185,7 +168,7 @@ class FarmerController extends Controller
         event(new FarmerUpdated($farmer, 'updated'));
 
         $farmer->plantings->each(function ($planting) {
-            $p = $planting->fresh(['farmer', 'barangay', 'crop', 'statusHistory']);
+            $p = $planting->fresh(['barangay', 'crop', 'statusHistory']);
             event(new \App\Events\PlantingUpdated($p, 'updated'));
         });
 
