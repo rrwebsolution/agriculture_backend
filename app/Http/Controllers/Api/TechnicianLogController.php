@@ -129,7 +129,7 @@ class TechnicianLogController extends Controller
             'status' => $request->input('status', $existingLog->status),
             'notes' => $request->input('notes', $existingLog->notes),
             'face_verified' => $request->has('face_verified') ? $request->input('face_verified') : $existingLog->face_verified,
-            'face_verified_at' => $request->input('face_verified_at', $existingLog->face_verified_at?->toISOString()),
+            'face_verified_at' => $request->input('face_verified_at', $existingLog->face_verified_at?->format('Y-m-d H:i:s')),
             'face_match_score' => $request->input('face_match_score', $existingLog->face_match_score),
             'verification_photo' => $request->input('verification_photo', $existingLog->verification_photo),
         ] : []);

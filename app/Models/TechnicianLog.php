@@ -29,7 +29,7 @@ class TechnicianLog extends Model
         'latitude' => 'float',
         'longitude' => 'float',
         'face_verified' => 'boolean',
-        'face_verified_at' => 'datetime',
+        'face_verified_at' => 'datetime:Y-m-d H:i:s',
         'face_match_score' => 'float',
     ];
 
