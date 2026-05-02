@@ -2,15 +2,29 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Contracts\Validation\Validator;
 
 class LoginRequest extends FormRequest
 {
+    private function loginErrorResponse(string $message, string $emailError = '', string $passwordError = '', int $status = 422): never
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => $message,
+            'errors' => [
+                'email' => $emailError,
+                'password' => $passwordError,
+            ],
+        ], $status));
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -32,6 +46,15 @@ class LoginRequest extends FormRequest
         ];
     }
 
+    protected function failedValidation(Validator $validator): void
+    {
+        $emailError = $validator->errors()->first('email') ?: '';
+        $passwordError = $validator->errors()->first('password') ?: '';
+        $message = $emailError ?: ($passwordError ?: 'Validation failed.');
+
+        $this->loginErrorResponse($message, $emailError, $passwordError);
+    }
+
     /**
      * Attempt to authenticate the request's credentials.
      *
@@ -41,14 +64,32 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $email = Str::lower((string) $this->input('email'));
+        $password = (string) $this->input('password');
+
+        $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if (! $user) {
             RateLimiter::hit($this->throttleKey());
 
-            throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
-            ]);
+            $this->loginErrorResponse(
+                'This email does not match our records.',
+                'This email does not match our records.',
+                ''
+            );
         }
 
+        if (! Hash::check($password, $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            $this->loginErrorResponse(
+                'This password does not match our records.',
+                '',
+                'This password does not match our records.'
+            );
+        }
+
+        Auth::login($user, $this->boolean('remember'));
         RateLimiter::clear($this->throttleKey());
     }
 
@@ -67,12 +108,12 @@ class LoginRequest extends FormRequest
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+        $message = trans('auth.throttle', [
+            'seconds' => $seconds,
+            'minutes' => ceil($seconds / 60),
         ]);
+
+        $this->loginErrorResponse($message, $message, $message);
     }
 
     /**
