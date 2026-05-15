@@ -115,15 +115,17 @@ class CooperativeController extends Controller
             'cda_no' => 'required|unique:cooperatives,cda_no',
             'name' => 'required|string',
             'type' => 'required|string',
-            'registration' => 'required|string',
+            'registration' => 'nullable|string',
             'org_type' => 'required|string',
             'chairman' => 'required|string',
             'contact_no' => 'nullable|string',
             'barangay_id' => 'required|exists:barangays,id',
             'address_details' => 'nullable|string',
-            'capital_cbu' => 'required|numeric',
+            'capital_cbu' => 'nullable|numeric',
             'status' => 'required|string',
         ]);
+
+        $validated['capital_cbu'] = $validated['capital_cbu'] ?? 0;
 
         $coop = Cooperative::create($validated);
 
@@ -146,15 +148,17 @@ class CooperativeController extends Controller
             'cda_no' => 'required|unique:cooperatives,cda_no,' . $id,
             'name' => 'required|string',
             'type' => 'required|string',
-            'registration' => 'required|string',
+            'registration' => 'nullable|string',
             'org_type' => 'required|string',
             'chairman' => 'required|string',
             'contact_no' => 'nullable|string',
             'barangay_id' => 'required|exists:barangays,id',
             'address_details' => 'nullable|string',
-            'capital_cbu' => 'required|numeric',
+            'capital_cbu' => 'nullable|numeric',
             'status' => 'required|string',
         ]);
+
+        $validated['capital_cbu'] = $validated['capital_cbu'] ?? 0;
 
         $coop->update($validated);
 
