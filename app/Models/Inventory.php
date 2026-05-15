@@ -9,7 +9,11 @@ class Inventory extends Model
     protected $fillable = [
         'name', 'commodity', 'category', 'sku', 
         'batch', 'stock', 'unit', 'threshold', 'status',
-        'recipients', 'year', 'remarks' // <-- GIDUGANG KINI
+        'recipients', 'expiration_date', 'year', 'remarks' // <-- GIDUGANG KINI
+    ];
+
+    protected $casts = [
+        'expiration_date' => 'date:Y-m-d',
     ];
 
     protected static function boot()
@@ -30,3 +34,5 @@ class Inventory extends Model
     return $this->hasMany(InventoryTransaction::class)->orderBy('transaction_date', 'desc');
 }
 }
+
+

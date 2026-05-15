@@ -575,8 +575,10 @@ class ReportController extends Controller
             'commodity' => 'Commodity',
             'category' => 'Category',
             'sku' => 'SKU',
+            'batch' => 'Batch',
             'stock' => 'Stock',
             'unit' => 'Unit',
+            'expiration_date' => 'Expiration Date',
             'status' => 'Status',
             'year' => 'Year',
         ];
@@ -589,8 +591,10 @@ class ReportController extends Controller
                 'commodity' => $this->textValue($i->commodity, 'Unspecified'),
                 'category' => $this->textValue($i->category, 'Uncategorized'),
                 'sku' => $this->textValue($i->sku, 'No SKU'),
+                'batch' => $this->textValue($i->batch, 'No Batch'),
                 'stock' => $this->numberValue($i->stock),
                 'unit' => $this->textValue($i->unit, 'Unspecified'),
+                'expiration_date' => $this->dateValue($i->expiration_date, 'No Expiration'),
                 'status' => $this->textValue($i->status, 'Unspecified'),
                 'year' => $this->textValue($i->year, 'Unknown Year'),
                 default => '',
@@ -724,3 +728,5 @@ class ReportController extends Controller
         ];
     }
 }
+
+

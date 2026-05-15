@@ -93,6 +93,7 @@ class InventoryController extends Controller
             'commodity' => 'nullable|string',
             'batch' => 'nullable|string',
             'recipients' => 'nullable|integer|min:0',
+            'expiration_date' => 'nullable|date',
             'year' => 'required|string',
             'remarks' => 'nullable|string',
             // Gidugang nato kini para sa initial transaction source
@@ -139,6 +140,7 @@ class InventoryController extends Controller
             'commodity' => 'nullable|string',
             'batch' => 'nullable|string',
             'recipients' => 'nullable|integer|min:0',
+            'expiration_date' => 'nullable|date',
             'year' => 'required|string',
             'remarks' => 'nullable|string'
         ]);
@@ -279,3 +281,5 @@ class InventoryController extends Controller
     });
 }
 }
+
+

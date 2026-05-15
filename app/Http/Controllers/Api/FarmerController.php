@@ -44,6 +44,45 @@ class FarmerController extends Controller
         return [];
     }
 
+    private function validateFarmProfile(Request $request): void
+    {
+        $request->validate([
+            'farms_list' => ['required', 'array', 'min:1'],
+            'farms_list.*.farm_barangay_id' => ['required'],
+            'farms_list.*.farm_sitio' => ['required', 'string', 'max:255'],
+            'farms_list.*.crop_id' => ['required'],
+            'farms_list.*.topography' => ['required', 'string', 'max:255'],
+            'farms_list.*.irrigation_type' => ['required', 'string', 'max:255'],
+            'farms_list.*.ownership_type' => ['required', 'string', 'max:255'],
+            'farms_list.*.soil_type' => ['required', 'string', 'max:255'],
+            'farms_list.*.total_area' => ['required'],
+            'assistances_list' => ['nullable', 'array'],
+            'assistances_list.*.program_name' => ['required', 'string', 'max:255'],
+            'assistances_list.*.assistance_type' => ['required', 'string', 'max:255'],
+            'assistances_list.*.assistance_kind' => ['nullable', 'string', 'max:255'],
+            'assistances_list.*.date_released' => ['required', 'date'],
+            'assistances_list.*.quantity' => ['required', 'string', 'max:255'],
+            'assistances_list.*.total_cost' => ['required'],
+            'assistances_list.*.funding_source' => ['required', 'string', 'max:255'],
+        ], [
+            'farms_list.required' => 'At least one farm profile is required.',
+            'farms_list.*.farm_barangay_id.required' => 'Farm barangay is required.',
+            'farms_list.*.farm_sitio.required' => 'Sitio / Purok is required.',
+            'farms_list.*.crop_id.required' => 'Main crop is required.',
+            'farms_list.*.topography.required' => 'Topography is required.',
+            'farms_list.*.irrigation_type.required' => 'Irrigation is required.',
+            'farms_list.*.ownership_type.required' => 'Ownership is required.',
+            'farms_list.*.soil_type.required' => 'Soil type is required.',
+            'farms_list.*.total_area.required' => 'Total area is required.',
+            'assistances_list.*.program_name.required' => 'Program name is required.',
+            'assistances_list.*.assistance_type.required' => 'Assistance type is required.',
+            'assistances_list.*.date_released.required' => 'Date released is required.',
+            'assistances_list.*.quantity.required' => 'Quantity is required.',
+            'assistances_list.*.total_cost.required' => 'Total cost is required.',
+            'assistances_list.*.funding_source.required' => 'Funding source is required.',
+        ]);
+    }
+
     private function syncRealtimeMetrics($crop_id, $barangay_id)
     {
         if ($crop_id) {
@@ -83,6 +122,8 @@ class FarmerController extends Controller
 
     public function store(Request $request)
     {
+        $this->validateFarmProfile($request);
+
         $data = $request->all();
         $newCoopIds = $this->parseCooperativeIds($data['cooperative_id'] ?? []);
 
@@ -126,6 +167,8 @@ class FarmerController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->validateFarmProfile($request);
+
         $farmer = Farmer::findOrFail($id);
         $old_crop_id = $farmer->crop_id;
         $old_brgy_id = $farmer->barangay_id;
@@ -202,3 +245,9 @@ class FarmerController extends Controller
         return response()->json(['message' => 'Farmer deleted']);
     }
 }
+
+
+
+
+
+

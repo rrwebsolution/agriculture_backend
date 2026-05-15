@@ -22,6 +22,7 @@ return new class extends Migration
             
             // --- GIDUGANG NGA FIELDS ---
             $table->integer('recipients')->default(0);
+            $table->date('expiration_date')->nullable();
             $table->string('year')->nullable();
             $table->text('remarks')->nullable();
 
