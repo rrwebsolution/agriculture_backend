@@ -121,10 +121,12 @@ class ReportController extends Controller
         ]);
     }
 
-    public function download(Report $report)
+    public function download(Request $request, Report $report)
     {
+        $footerLabel = $this->reportFooterLabel($request->query('action'));
+
         try {
-            $filePath = $this->generateFile($report);
+            $filePath = $this->generateFile($report, $footerLabel);
             $report->update(['file_path' => $filePath]);
             $report->refresh();
         } catch (\Exception $e) {
@@ -162,7 +164,7 @@ class ReportController extends Controller
         ]);
     }
 
-    private function generateFile(Report $report): string
+    private function generateFile(Report $report, string $footerLabel = 'Generated'): string
     {
         $data = $this->fetchReportData($report);
         $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $report->type);
@@ -171,7 +173,7 @@ class ReportController extends Controller
         Storage::makeDirectory('reports');
 
         if ($report->format === 'PDF') {
-            $pdf = Pdf::loadView('reports.template', compact('report', 'data'))
+            $pdf = Pdf::loadView('reports.template', compact('report', 'data', 'footerLabel'))
                 ->setPaper('a4', 'landscape');
             $path = "reports/{$filename}.pdf";
             Storage::put($path, $pdf->output());
@@ -181,6 +183,15 @@ class ReportController extends Controller
         }
 
         return $path;
+    }
+
+    private function reportFooterLabel(?string $action): string
+    {
+        return match (strtolower((string) $action)) {
+            'printed', 'print' => 'Printed',
+            'download', 'downloaded' => 'Download',
+            default => 'Generated',
+        };
     }
 
     private function fetchReportData(Report $report): array
