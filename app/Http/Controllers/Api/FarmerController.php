@@ -44,8 +44,37 @@ class FarmerController extends Controller
         return [];
     }
 
+    private function normalizeTotalCostValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = str_replace(',', '', (string) $value);
+        return is_numeric($normalized) ? number_format((float) $normalized, 2, '.', '') : $normalized;
+    }
+
+    private function normalizeAssistanceCosts(Request $request): void
+    {
+        $assistances = $request->input('assistances_list');
+
+        if (!is_array($assistances)) {
+            return;
+        }
+
+        foreach ($assistances as $index => $assistance) {
+            if (array_key_exists('total_cost', $assistance)) {
+                $assistances[$index]['total_cost'] = $this->normalizeTotalCostValue($assistance['total_cost']);
+            }
+        }
+
+        $request->merge(['assistances_list' => $assistances]);
+    }
+
     private function validateFarmProfile(Request $request): void
     {
+        $this->normalizeAssistanceCosts($request);
+
         $request->validate([
             'farms_list' => ['required', 'array', 'min:1'],
             'farms_list.*.farm_barangay_id' => ['required'],
@@ -62,7 +91,7 @@ class FarmerController extends Controller
             'assistances_list.*.assistance_kind' => ['nullable', 'string', 'max:255'],
             'assistances_list.*.date_released' => ['required', 'date'],
             'assistances_list.*.quantity' => ['required', 'string', 'max:255'],
-            'assistances_list.*.total_cost' => ['required'],
+            'assistances_list.*.total_cost' => ['required', 'numeric', 'min:0'],
             'assistances_list.*.funding_source' => ['required', 'string', 'max:255'],
         ], [
             'farms_list.required' => 'At least one farm profile is required.',
