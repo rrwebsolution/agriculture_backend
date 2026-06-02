@@ -10,7 +10,7 @@ class Farmer extends Model
     use HasFactory;
 
     protected $fillable = [
-        'system_id', 'rsbsa_no', 'first_name', 'middle_name', 'last_name', 'suffix',
+        'system_id', 'rsbsa_no', 'first_name', 'middle_name', 'last_name', 'suffix', 'profile_photo_path',
         'gender', 'dob', 'barangay_id', 'address_details', 'contact_no',
         'farm_barangay_id', 'farm_sitio', 'crop_id', 'ownership_type', 
         'total_area', 'farm_coordinates', 'soil_type', 'gpx_file_path',
@@ -29,7 +29,7 @@ class Farmer extends Model
     ];
 
     // 🌟 I-APPEND KINI PARA INIG FETCH SA FARMER, MUPAKITA DAYUN ANG COOPERATIVE DATA
-    protected $appends = ['assigned_cooperatives'];
+    protected $appends = ['assigned_cooperatives', 'profile_photo_url'];
 
     public function barangay() 
     { 
@@ -56,6 +56,11 @@ class Farmer extends Model
         // Return the Cooperative details (id, name, type) based on IDs inside the array
         return Cooperative::whereIn('id', $this->cooperative_id)
                 ->get(['id', 'name', 'type', 'status', 'registration', 'org_type']);
+    }
+
+    public function getProfilePhotoUrlAttribute()
+    {
+        return $this->profile_photo_path ? asset($this->profile_photo_path) : null;
     }
 
     public function plantings()

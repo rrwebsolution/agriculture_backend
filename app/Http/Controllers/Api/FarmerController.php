@@ -10,6 +10,7 @@ use App\Models\Barangay;
 use App\Models\Crop;
 use App\Models\Farmer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 
 class FarmerController extends Controller
 {
@@ -71,11 +72,49 @@ class FarmerController extends Controller
         $request->merge(['assistances_list' => $assistances]);
     }
 
+    private function decodeJsonArrayFields(Request $request, array $fields): void
+    {
+        foreach ($fields as $field) {
+            $value = $request->input($field);
+
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $request->merge([$field => $decoded]);
+                }
+            }
+        }
+    }
+
+    private function storeProfilePhoto(Request $request, ?Farmer $farmer = null): ?string
+    {
+        if (!$request->hasFile('profile_photo')) {
+            return $farmer?->profile_photo_path;
+        }
+
+        $file = $request->file('profile_photo');
+        $directory = public_path('uploads/profile-photos/farmers');
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        if ($farmer?->profile_photo_path) {
+            File::delete(public_path($farmer->profile_photo_path));
+        }
+
+        $filename = uniqid('farmer_', true) . '.' . $file->getClientOriginalExtension();
+        $file->move($directory, $filename);
+
+        return 'uploads/profile-photos/farmers/' . $filename;
+    }
+
     private function validateFarmProfile(Request $request): void
     {
+        $this->decodeJsonArrayFields($request, ['cooperative_id', 'farms_list', 'assistances_list']);
         $this->normalizeAssistanceCosts($request);
 
         $request->validate([
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'farms_list' => ['required', 'array', 'min:1'],
             'farms_list.*.farm_barangay_id' => ['required'],
             'farms_list.*.farm_sitio' => ['required', 'string', 'max:255'],
@@ -154,6 +193,8 @@ class FarmerController extends Controller
         $this->validateFarmProfile($request);
 
         $data = $request->all();
+        unset($data['profile_photo'], $data['profile_photo_url']);
+        $data['profile_photo_path'] = $this->storeProfilePhoto($request);
         $newCoopIds = $this->parseCooperativeIds($data['cooperative_id'] ?? []);
 
         if (isset($data['cooperative_id']) && is_string($data['cooperative_id'])) {
@@ -204,6 +245,8 @@ class FarmerController extends Controller
         $oldCoopIds = $this->parseCooperativeIds($farmer->cooperative_id);
 
         $data = $request->all();
+        unset($data['profile_photo'], $data['profile_photo_url'], $data['_method']);
+        $data['profile_photo_path'] = $this->storeProfilePhoto($request, $farmer);
         $newCoopIds = $this->parseCooperativeIds($data['cooperative_id'] ?? $farmer->cooperative_id);
 
         if (isset($data['cooperative_id']) && is_string($data['cooperative_id'])) {

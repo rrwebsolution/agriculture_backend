@@ -12,7 +12,7 @@ class Fisherfolk extends Model
     protected $table = 'fisherfolks';
 
     protected $fillable = [
-        'system_id', 'first_name', 'middle_name', 'last_name', 'suffix',
+        'system_id', 'first_name', 'middle_name', 'last_name', 'suffix', 'profile_photo_path',
         'gender', 'dob', 'age', 'civil_status', 'barangay_id', 'address_details',
         'contact_no', 'education', 'fisher_type', 'is_main_livelihood',
         'years_in_fishing', 'org_member', 'status',
@@ -30,6 +30,13 @@ class Fisherfolk extends Model
         'boats_list' => 'array',
         'assistances_list' => 'array',
     ];
+
+    protected $appends = ['profile_photo_url'];
+
+    public function getProfilePhotoUrlAttribute()
+    {
+        return $this->profile_photo_path ? asset($this->profile_photo_path) : null;
+    }
 
     public function barangay()
     {

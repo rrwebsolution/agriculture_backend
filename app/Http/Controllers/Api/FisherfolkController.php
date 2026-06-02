@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Barangay;
 use App\Models\Fisherfolk;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 
 class FisherfolkController extends Controller
 {
@@ -71,6 +72,42 @@ class FisherfolkController extends Controller
         ], 'updated'));
     }
 
+    private function decodeJsonArrayFields(Request $request, array $fields): void
+    {
+        foreach ($fields as $field) {
+            $value = $request->input($field);
+
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $request->merge([$field => $decoded]);
+                }
+            }
+        }
+    }
+
+    private function storeProfilePhoto(Request $request, ?Fisherfolk $fisher = null): ?string
+    {
+        if (!$request->hasFile('profile_photo')) {
+            return $fisher?->profile_photo_path;
+        }
+
+        $file = $request->file('profile_photo');
+        $directory = public_path('uploads/profile-photos/fisherfolks');
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        if ($fisher?->profile_photo_path) {
+            File::delete(public_path($fisher->profile_photo_path));
+        }
+
+        $filename = uniqid('fisherfolk_', true) . '.' . $file->getClientOriginalExtension();
+        $file->move($directory, $filename);
+
+        return 'uploads/profile-photos/fisherfolks/' . $filename;
+    }
+
     public function index()
     {
         $records = Fisherfolk::with(['barangay', 'catchRecords'])->latest()->get();
@@ -79,9 +116,11 @@ class FisherfolkController extends Controller
 
     public function store(Request $request)
     {
+        $this->decodeJsonArrayFields($request, ['cooperative_id', 'boats_list', 'assistances_list']);
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', []));
 
         $validated = $request->validate([
+            'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'system_id' => 'required|unique:fisherfolks,system_id',
             'first_name' => 'required|string',
             'last_name' => 'required|string',
@@ -102,7 +141,11 @@ class FisherfolkController extends Controller
             'status' => 'required|in:active,inactive'
         ]);
 
-        $fisher = Fisherfolk::create($request->all());
+        $data = $request->all();
+        unset($data['profile_photo'], $data['profile_photo_url']);
+        $data['profile_photo_path'] = $this->storeProfilePhoto($request);
+
+        $fisher = Fisherfolk::create($data);
         $fisher = $fisher->fresh(['barangay', 'catchRecords']);
 
         $this->broadcastBarangayUpdate($fisher->barangay_id);
@@ -118,12 +161,14 @@ class FisherfolkController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->decodeJsonArrayFields($request, ['cooperative_id', 'boats_list', 'assistances_list']);
         $fisher = Fisherfolk::findOrFail($id);
         $old_brgy = $fisher->barangay_id;
         $oldCoopIds = $this->parseCooperativeIds($fisher->cooperative_id);
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', $fisher->cooperative_id));
 
         $validated = $request->validate([
+            'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'first_name' => 'sometimes|required|string',
             'last_name' => 'sometimes|required|string',
             'gender' => 'sometimes|required|string',
@@ -143,7 +188,11 @@ class FisherfolkController extends Controller
             'status' => 'sometimes|required|in:active,inactive'
         ]);
 
-        $fisher->update($request->all());
+        $data = $request->all();
+        unset($data['profile_photo'], $data['profile_photo_url'], $data['_method']);
+        $data['profile_photo_path'] = $this->storeProfilePhoto($request, $fisher);
+
+        $fisher->update($data);
         $fisher = $fisher->fresh(['barangay', 'catchRecords']);
 
         $this->broadcastBarangayUpdate($fisher->barangay_id);
