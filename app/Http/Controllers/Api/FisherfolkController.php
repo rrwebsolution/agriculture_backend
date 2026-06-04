@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\File;
 
 class FisherfolkController extends Controller
 {
+    private const PROFILE_PHOTO_MAX_KB = 2048;
+
     private function parseCooperativeIds($value): array
     {
         if (is_array($value)) {
@@ -120,7 +122,7 @@ class FisherfolkController extends Controller
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', []));
 
         $validated = $request->validate([
-            'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
             'system_id' => 'required|unique:fisherfolks,system_id',
             'first_name' => 'required|string',
             'last_name' => 'required|string',
@@ -139,6 +141,8 @@ class FisherfolkController extends Controller
             'permit_expiry' => 'required|date',
             'inspection_status' => 'required|string',
             'status' => 'required|in:active,inactive'
+        ], [
+            'profile_photo.max' => 'Profile photo must not be greater than 2MB.',
         ]);
 
         $data = $request->all();
@@ -168,7 +172,7 @@ class FisherfolkController extends Controller
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', $fisher->cooperative_id));
 
         $validated = $request->validate([
-            'profile_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
             'first_name' => 'sometimes|required|string',
             'last_name' => 'sometimes|required|string',
             'gender' => 'sometimes|required|string',
@@ -186,6 +190,8 @@ class FisherfolkController extends Controller
             'permit_expiry' => 'sometimes|required|date',
             'inspection_status' => 'sometimes|required|string',
             'status' => 'sometimes|required|in:active,inactive'
+        ], [
+            'profile_photo.max' => 'Profile photo must not be greater than 2MB.',
         ]);
 
         $data = $request->all();

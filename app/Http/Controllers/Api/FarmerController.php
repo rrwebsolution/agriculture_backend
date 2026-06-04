@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\File;
 
 class FarmerController extends Controller
 {
+    private const PROFILE_PHOTO_MAX_KB = 2048;
+
     private function parseCooperativeIds($value): array
     {
         if (is_array($value)) {
@@ -114,7 +116,7 @@ class FarmerController extends Controller
         $this->normalizeAssistanceCosts($request);
 
         $request->validate([
-            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
             'farms_list' => ['required', 'array', 'min:1'],
             'farms_list.*.farm_barangay_id' => ['required'],
             'farms_list.*.farm_sitio' => ['required', 'string', 'max:255'],
@@ -133,6 +135,7 @@ class FarmerController extends Controller
             'assistances_list.*.total_cost' => ['required', 'numeric', 'min:0'],
             'assistances_list.*.funding_source' => ['required', 'string', 'max:255'],
         ], [
+            'profile_photo.max' => 'Profile photo must not be greater than 2MB.',
             'farms_list.required' => 'At least one farm profile is required.',
             'farms_list.*.farm_barangay_id.required' => 'Farm barangay is required.',
             'farms_list.*.farm_sitio.required' => 'Sitio / Purok is required.',
