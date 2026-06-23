@@ -27,19 +27,15 @@ class BarangaySeeder extends Seeder
         // Gingoog City Base Coordinates
         $baseLat = 8.8234;
         $baseLng = 125.1234;
-        $reservedCodes = collect($list)
-            ->keys()
-            ->map(fn ($index) => 'BRGY-' . (1001 + $index));
+        DB::transaction(function () use ($list, $baseLat, $baseLng) {
+            // Remove legacy/duplicate rows that are not part of Gingoog's
+            // official 79 barangays. Existing official rows are retained so
+            // their IDs, coordinates, and related records remain unchanged.
+            Barangay::whereNotIn('name', $list)->delete();
 
-        DB::transaction(function () use ($list, $baseLat, $baseLng, $reservedCodes) {
             // Release the current codes first. Updating them one at a time can
             // collide when an existing barangay already owns the next code.
-            $legacyBarangays = Barangay::whereIn('code', $reservedCodes)
-                ->whereNotIn('name', $list)
-                ->get();
-
             Barangay::whereIn('name', $list)
-                ->orWhereIn('code', $reservedCodes)
                 ->get(['id'])
                 ->each(function (Barangay $barangay) {
                     $barangay->forceFill([
@@ -65,27 +61,17 @@ class BarangaySeeder extends Seeder
                 $lng = $baseLng + sin($angle) * $radius * (mt_rand(50, 100) / 100);
 
             // GIGAMIT NATO ANG updateOrCreate ARON MA-UPDATE RA ANG COORDINATES, WALAY MA DELETE NGA FARMERS O CROPS
-                Barangay::updateOrCreate(
-                    ['name' => $name], // Pangitaon ang barangay gamit ang ngalan
-                    [
-                        'code' => 'BRGY-' . (1001 + $index),
-                        'type' => $type,
-                        'latitude' => round($lat, 6),
-                        'longitude' => round($lng, 6),
-                    ]
-                );
-            }
+                $barangay = Barangay::firstOrNew(['name' => $name]);
 
-            // Keep legacy rows, but move them outside the reserved seed range.
-            $nextCode = 1001 + count($list);
-
-            foreach ($legacyBarangays as $barangay) {
-                while (Barangay::where('code', 'BRGY-' . $nextCode)->exists()) {
-                    $nextCode++;
+                // Never replace coordinates already stored in Forge.
+                if (!$barangay->exists) {
+                    $barangay->latitude = round($lat, 6);
+                    $barangay->longitude = round($lng, 6);
                 }
 
-                $barangay->forceFill(['code' => 'BRGY-' . $nextCode])->save();
-                $nextCode++;
+                $barangay->code = 'BRGY-' . (1001 + $index);
+                $barangay->type = $type;
+                $barangay->save();
             }
         });
     }
