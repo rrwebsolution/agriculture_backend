@@ -15,6 +15,7 @@ class Farmer extends Model
         'farm_barangay_id', 'farm_sitio', 'crop_id', 'ownership_type', 
         'total_area', 'farm_coordinates', 'soil_type', 'gpx_file_path',
         'topography', 'irrigation_type', 'area_breakdown',
+        'is_farm_worker',
         'is_main_livelihood', 'is_coop_member', 'cooperative_id',
         'program_name', 'assistance_type', 'date_released', 
         'quantity', 'total_cost', 'funding_source', 'status',
@@ -26,6 +27,7 @@ class Farmer extends Model
         'farms_list' => 'array',      
         'assistances_list' => 'array', 
         'cooperative_id' => 'array', 
+        'is_farm_worker' => 'boolean',
     ];
 
     // 🌟 I-APPEND KINI PARA INIG FETCH SA FARMER, MUPAKITA DAYUN ANG COOPERATIVE DATA

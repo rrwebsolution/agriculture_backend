@@ -55,6 +55,7 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::apiResource('barangays', BarangayController::class);
     Route::apiResource('danger-zones', DangerZoneController::class);
     Route::apiResource('fishery', FisheryController::class);
+    Route::post('/crops/{crop}/types', [CropController::class, 'addCropType']);
     Route::apiResource('crops', CropController::class);
     Route::apiResource('cooperatives', CooperativeController::class);
     Route::apiResource('fisherfolks', FisherfolkController::class);

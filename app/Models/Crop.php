@@ -11,17 +11,17 @@ class Crop extends Model
 
     protected $fillable = [
         'category',
-        'remarks'
+        'crop_names',
+        'remarks',
     ];
 
-
-    public function registeredFarmers() {
-    return $this->hasMany(Farmer::class)->with(['barangay']); // ✅ DAPAT ING-ANI NALANG
-}
+    public function registeredFarmers()
+    {
+        return $this->hasMany(Farmer::class)->with(['barangay']);
+    }
 
     public function plantings()
     {
         return $this->hasMany(Planting::class, 'crop_id');
     }
-
 }

@@ -114,13 +114,21 @@ class FarmerController extends Controller
     {
         $this->decodeJsonArrayFields($request, ['cooperative_id', 'farms_list', 'assistances_list']);
         $this->normalizeAssistanceCosts($request);
+        $isFarmWorker = $request->boolean('is_farm_worker');
+
+        if ($isFarmWorker) {
+            $request->merge(['farms_list' => []]);
+        }
 
         $request->validate([
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
-            'farms_list' => ['required', 'array', 'min:1'],
+            'is_farm_worker' => ['required', 'boolean'],
+            'farms_list' => $isFarmWorker ? ['nullable', 'array', 'max:0'] : ['required', 'array', 'min:1'],
             'farms_list.*.farm_barangay_id' => ['required'],
             'farms_list.*.farm_sitio' => ['required', 'string', 'max:255'],
             'farms_list.*.crop_id' => ['required'],
+            'farms_list.*.crop_types' => ['required', 'array', 'min:1'],
+            'farms_list.*.crop_types.*' => ['required', 'string', 'max:255'],
             'farms_list.*.topography' => ['required', 'string', 'max:255'],
             'farms_list.*.irrigation_type' => ['required', 'string', 'max:255'],
             'farms_list.*.ownership_type' => ['required', 'string', 'max:255'],
@@ -140,6 +148,8 @@ class FarmerController extends Controller
             'farms_list.*.farm_barangay_id.required' => 'Farm barangay is required.',
             'farms_list.*.farm_sitio.required' => 'Sitio / Purok is required.',
             'farms_list.*.crop_id.required' => 'Main crop is required.',
+            'farms_list.*.crop_types.required' => 'At least one crop type or variety is required.',
+            'farms_list.*.crop_types.min' => 'At least one crop type or variety is required.',
             'farms_list.*.topography.required' => 'Topography is required.',
             'farms_list.*.irrigation_type.required' => 'Irrigation is required.',
             'farms_list.*.ownership_type.required' => 'Ownership is required.',
@@ -152,6 +162,7 @@ class FarmerController extends Controller
             'assistances_list.*.total_cost.required' => 'Total cost is required.',
             'assistances_list.*.funding_source.required' => 'Funding source is required.',
         ]);
+
     }
 
     private function syncRealtimeMetrics($crop_id, $barangay_id)
@@ -216,6 +227,17 @@ class FarmerController extends Controller
             $data['farm_coordinates'] = $firstFarm['farm_coordinates'] ?? null;
             $data['soil_type'] = $firstFarm['soil_type'] ?? null;
             $data['gpx_file_path'] = $firstFarm['gpx_file_name'] ?? null;
+        } else {
+            $data['farm_barangay_id'] = null;
+            $data['farm_sitio'] = null;
+            $data['crop_id'] = null;
+            $data['ownership_type'] = null;
+            $data['total_area'] = null;
+            $data['topography'] = null;
+            $data['irrigation_type'] = null;
+            $data['farm_coordinates'] = null;
+            $data['soil_type'] = null;
+            $data['gpx_file_path'] = null;
         }
 
         if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
@@ -268,6 +290,17 @@ class FarmerController extends Controller
             $data['farm_coordinates'] = $firstFarm['farm_coordinates'] ?? null;
             $data['soil_type'] = $firstFarm['soil_type'] ?? null;
             $data['gpx_file_path'] = $firstFarm['gpx_file_name'] ?? null;
+        } else {
+            $data['farm_barangay_id'] = null;
+            $data['farm_sitio'] = null;
+            $data['crop_id'] = null;
+            $data['ownership_type'] = null;
+            $data['total_area'] = null;
+            $data['topography'] = null;
+            $data['irrigation_type'] = null;
+            $data['farm_coordinates'] = null;
+            $data['soil_type'] = null;
+            $data['gpx_file_path'] = null;
         }
 
         if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {

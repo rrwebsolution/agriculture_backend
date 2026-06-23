@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\CropUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Crop;
 use Illuminate\Http\Request;
-use App\Events\CropUpdated; // 🌟 I-IMPORT ANG EVENT
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class CropController extends Controller
 {
@@ -14,16 +16,17 @@ class CropController extends Controller
         $crops = Crop::latest()
             ->withCount('registeredFarmers')
             ->with([
-                'registeredFarmers' => function($query) {
+                'registeredFarmers' => function ($query) {
                     $query->latest();
                 },
                 'registeredFarmers.barangay',
-                'registeredFarmers.farmLocation'
+                'registeredFarmers.farmLocation',
             ])->orderBy('id', 'asc')
             ->get();
 
         $crops->map(function ($crop) {
             $crop->farmers = $crop->registered_farmers_count;
+
             return $crop;
         });
 
@@ -33,65 +36,107 @@ class CropController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'category' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('crops', 'category')],
-            'remarks'  => 'required|string',
+            'category' => ['required', 'string', 'max:255', Rule::unique('crops', 'category')],
+            'crop_names' => ['required', 'string', 'max:2000'],
+            'remarks' => ['required', 'string'],
         ]);
 
         $crop = Crop::create($validatedData);
-
-        // 🌟 I-format ang data para matches sa Frontend
         $crop->farmers = 0;
         $crop->registered_farmers = [];
 
-        // 🌟 BROADCAST EVENT: CREATED
         event(new CropUpdated($crop, 'created'));
 
         return response()->json([
             'message' => 'Land record successfully created!',
-            'data'    => $crop
+            'data' => $crop,
         ], 201);
     }
 
     public function update(Request $request, $id)
-{
-    $crop = Crop::findOrFail($id);
+    {
+        $crop = Crop::findOrFail($id);
 
-    $validatedData = $request->validate([
-        'category' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('crops', 'category')->ignore($crop->id)],
-        'remarks'  => 'required|string',
-    ]);
+        $validatedData = $request->validate([
+            'category' => ['required', 'string', 'max:255', Rule::unique('crops', 'category')->ignore($crop->id)],
+            'crop_names' => ['required', 'string', 'max:2000'],
+            'remarks' => ['required', 'string'],
+        ]);
 
-    $crop->update($validatedData);
+        $crop->update($validatedData);
 
-    // 🌟 I-notify ang tanang planting logs nga naggamit niini nga crop
-    // Siguroon nato nga dili null ang plantings
-    if ($crop->plantings) {
-        $crop->plantings->each(function ($planting) {
-            $p = $planting->fresh(['farmer', 'barangay', 'crop', 'statusHistory']);
-            // I-broadcast as PlantingUpdated para sa Table
-            broadcast(new \App\Events\PlantingUpdated($p, 'updated'));
-        });
+        if ($crop->plantings) {
+            $crop->plantings->each(function ($planting) {
+                $planting = $planting->fresh(['farmer', 'barangay', 'crop', 'statusHistory']);
+                broadcast(new \App\Events\PlantingUpdated($planting, 'updated'));
+            });
+        }
+
+        $crop->loadCount('registeredFarmers');
+        $crop->load([
+            'registeredFarmers' => function ($query) {
+                $query->latest();
+            },
+            'registeredFarmers.barangay',
+            'registeredFarmers.farmLocation',
+        ]);
+
+        $crop->farmers = $crop->registered_farmers_count;
+        $crop->registered_farmers = $crop->registeredFarmers;
+
+        broadcast(new CropUpdated($crop, 'updated'));
+
+        return response()->json([
+            'message' => 'Land record successfully updated!',
+            'data' => $crop,
+        ]);
     }
 
-    // Refresh data para sa Crop module mismo
-    $crop->loadCount('registeredFarmers');
-    $crop->load([
-        'registeredFarmers' => function($query) { $query->latest(); },
-        'registeredFarmers.barangay',
-        'registeredFarmers.farmLocation'
-    ]);
-    
-    $crop->farmers = $crop->registered_farmers_count;
-    $crop->registered_farmers = $crop->registeredFarmers;
+    public function addCropType(Request $request, Crop $crop)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'not_regex:/,/'],
+        ], [
+            'name.not_regex' => 'Add one crop type or variety at a time.',
+        ]);
 
-    // BROADCAST PARA SA CROP MODULE & DROPDOWNS
-    broadcast(new CropUpdated($crop, 'updated'));
+        $name = preg_replace('/\s+/', ' ', trim($validated['name']));
 
-    return response()->json([
-        'message' => 'Land record successfully updated!',
-        'data'    => $crop
-    ]);
-}
+        [$updatedCrop, $savedName, $created] = DB::transaction(function () use ($crop, $name) {
+            $lockedCrop = Crop::query()->lockForUpdate()->findOrFail($crop->id);
+            $cropTypes = collect(explode(',', (string) $lockedCrop->crop_names))
+                ->map(fn ($type) => trim($type))
+                ->filter()
+                ->values();
+
+            $existingName = $cropTypes->first(
+                fn ($type) => strcasecmp($type, $name) === 0
+            );
+
+            if (! $existingName) {
+                $cropTypes->push($name);
+                $lockedCrop->update(['crop_names' => $cropTypes->implode(', ')]);
+            }
+
+            return [$lockedCrop->fresh(), $existingName ?: $name, ! $existingName];
+        });
+
+        $updatedCrop->loadCount('registeredFarmers');
+        $updatedCrop->load([
+            'registeredFarmers' => fn ($query) => $query->latest(),
+            'registeredFarmers.barangay',
+            'registeredFarmers.farmLocation',
+        ]);
+        $updatedCrop->farmers = $updatedCrop->registered_farmers_count;
+
+        broadcast(new CropUpdated($updatedCrop, 'updated'));
+
+        return response()->json([
+            'message' => $created ? 'Crop type added successfully.' : 'Crop type already exists.',
+            'crop_type' => $savedName,
+            'data' => $updatedCrop,
+        ], $created ? 201 : 200);
+    }
 
     public function destroy($id)
     {
@@ -99,17 +144,15 @@ class CropController extends Controller
 
         if ($crop->registered_farmers_count > 0) {
             return response()->json([
-                'message' => 'Cannot delete this record because it is currently assigned to ' . $crop->registered_farmers_count . ' farmer(s).'
-            ], 422); 
+                'message' => 'Cannot delete this record because it is currently assigned to '.$crop->registered_farmers_count.' farmer(s).',
+            ], 422);
         }
 
         $crop->delete();
-
-        // 🌟 BROADCAST EVENT: DELETED
         event(new CropUpdated($crop, 'deleted'));
 
         return response()->json([
-            'message' => 'Land record successfully deleted!'
+            'message' => 'Land record successfully deleted!',
         ]);
     }
 }
