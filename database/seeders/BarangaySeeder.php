@@ -27,11 +27,19 @@ class BarangaySeeder extends Seeder
         // Gingoog City Base Coordinates
         $baseLat = 8.8234;
         $baseLng = 125.1234;
+        $reservedCodes = collect($list)
+            ->keys()
+            ->map(fn ($index) => 'BRGY-' . (1001 + $index));
 
-        DB::transaction(function () use ($list, $baseLat, $baseLng) {
+        DB::transaction(function () use ($list, $baseLat, $baseLng, $reservedCodes) {
             // Release the current codes first. Updating them one at a time can
             // collide when an existing barangay already owns the next code.
+            $legacyBarangays = Barangay::whereIn('code', $reservedCodes)
+                ->whereNotIn('name', $list)
+                ->get();
+
             Barangay::whereIn('name', $list)
+                ->orWhereIn('code', $reservedCodes)
                 ->get(['id'])
                 ->each(function (Barangay $barangay) {
                     $barangay->forceFill([
@@ -66,6 +74,18 @@ class BarangaySeeder extends Seeder
                         'longitude' => round($lng, 6),
                     ]
                 );
+            }
+
+            // Keep legacy rows, but move them outside the reserved seed range.
+            $nextCode = 1001 + count($list);
+
+            foreach ($legacyBarangays as $barangay) {
+                while (Barangay::where('code', 'BRGY-' . $nextCode)->exists()) {
+                    $nextCode++;
+                }
+
+                $barangay->forceFill(['code' => 'BRGY-' . $nextCode])->save();
+                $nextCode++;
             }
         });
     }
