@@ -9,19 +9,19 @@ class Barangay extends Model
 {
     // 🌟 GIDUGANG ANG LATITUDE UG LONGITUDE DIRI
     protected $fillable = [
-        'name', 'type', 'latitude', 'longitude' 
+        'name', 'code', 'type', 'latitude', 'longitude'
     ];
 
     protected static function booted()
     {
         static::creating(function ($barangay) {
-            $latestBarangay = self::orderBy('id', 'desc')->first();
+            if (blank($barangay->code)) {
+                $latestNumber = self::query()
+                    ->where('code', 'regexp', '^BRGY-[0-9]+$')
+                    ->selectRaw('MAX(CAST(SUBSTRING(code, 6) AS UNSIGNED)) as number')
+                    ->value('number');
 
-            if (!$latestBarangay) {
-                $barangay->code = 'BRGY-1001';
-            } else {
-                $number = str_replace('BRGY-', '', $latestBarangay->code);
-                $barangay->code = 'BRGY-' . (intval($number) + 1);
+                $barangay->code = 'BRGY-' . max(1001, ((int) $latestNumber) + 1);
             }
         });
     }

@@ -28,33 +28,45 @@ class BarangaySeeder extends Seeder
         $baseLat = 8.8234;
         $baseLng = 125.1234;
 
-        foreach ($list as $index => $name) {
-            $type = "Rural";
+        DB::transaction(function () use ($list, $baseLat, $baseLng) {
+            // Release the current codes first. Updating them one at a time can
+            // collide when an existing barangay already owns the next code.
+            Barangay::whereIn('name', $list)
+                ->get(['id'])
+                ->each(function (Barangay $barangay) {
+                    $barangay->forceFill([
+                        'code' => 'BRGY-TMP-' . $barangay->id,
+                    ])->save();
+                });
+
+            foreach ($list as $index => $name) {
+                $type = "Rural";
             
-            if (str_contains($name, "Barangay")) {
-                $type = "Urban (Poblacion)";
-            }
-            
-            if (in_array($name, ["Anakan", "Odiongan", "Lunao", "Agay-ayan", "Punong", "San Juan", "Talisay", "Daang-Lungsod", "Pangasihan", "San Roque", "Bantaawan"])) {
-                $type = "Coastal";
-            }
+                if (str_contains($name, "Barangay")) {
+                    $type = "Urban (Poblacion)";
+                }
+
+                if (in_array($name, ["Anakan", "Odiongan", "Lunao", "Agay-ayan", "Punong", "San Juan", "Talisay", "Daang-Lungsod", "Pangasihan", "San Roque", "Bantaawan"])) {
+                    $type = "Coastal";
+                }
 
             // 🌟 MAG-GENERATE UG RANDOM COORDINATES PALIBOT SA GINGOOG PARA SA MGA WALAY DATA
-            $radius = 0.05; // radius spread
-            $angle = ($index / count($list)) * M_PI * 2;
-            $lat = $baseLat + cos($angle) * $radius * (mt_rand(50, 100) / 100);
-            $lng = $baseLng + sin($angle) * $radius * (mt_rand(50, 100) / 100);
+                $radius = 0.05; // radius spread
+                $angle = ($index / count($list)) * M_PI * 2;
+                $lat = $baseLat + cos($angle) * $radius * (mt_rand(50, 100) / 100);
+                $lng = $baseLng + sin($angle) * $radius * (mt_rand(50, 100) / 100);
 
             // GIGAMIT NATO ANG updateOrCreate ARON MA-UPDATE RA ANG COORDINATES, WALAY MA DELETE NGA FARMERS O CROPS
-            Barangay::updateOrCreate(
-                ['name' => $name], // Pangitaon ang barangay gamit ang ngalan
-                [
-                    'code' => 'BRGY-' . (1001 + $index),
-                    'type' => $type,
-                    'latitude' => round($lat, 6),
-                    'longitude' => round($lng, 6),
-                ]
-            );
-        }
+                Barangay::updateOrCreate(
+                    ['name' => $name], // Pangitaon ang barangay gamit ang ngalan
+                    [
+                        'code' => 'BRGY-' . (1001 + $index),
+                        'type' => $type,
+                        'latitude' => round($lat, 6),
+                        'longitude' => round($lng, 6),
+                    ]
+                );
+            }
+        });
     }
 }
