@@ -10,6 +10,16 @@ class BarangaySeeder extends Seeder
 {
     public function run()
     {
+        // Never normalize or delete live barangay data when this seeder is
+        // invoked directly during a Forge deployment.
+        if (app()->environment('production')) {
+            $this->command?->warn(
+                'Barangay seeding skipped: production data is preserved.'
+            );
+
+            return;
+        }
+
         // 🌟 Ang Kumpleto ug Eksakto nga 79 ka Barangay sa Gingoog City
         $list = [
             "Agay-ayan", "Alagatan", "Anakan", "Bagubad", "Bakid-bakid", "Bal-ason", "Bantaawan", "Binakalan", 
