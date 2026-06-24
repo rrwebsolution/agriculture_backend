@@ -12,9 +12,12 @@ class PlantingController extends Controller
 {
     public function index()
     {
-        // Fetch lang sa plantings diin ang Farmer kay 'active'
-        $plantings = Planting::whereHas('farmer', function ($query) {
-                $query->where('status', 'active');
+        // Include barangay-only records and records with an active farmer.
+        $plantings = Planting::where(function ($query) {
+                $query->whereNull('farmer_id')
+                    ->orWhereHas('farmer', function ($farmerQuery) {
+                        $farmerQuery->where('status', 'active');
+                    });
             })
             ->with(['farmer', 'barangay', 'crop', 'statusHistory'])
             ->latest()
@@ -30,7 +33,7 @@ class PlantingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'farmer_id'    => 'required|exists:farmers,id',
+            'farmer_id'    => 'nullable|exists:farmers,id',
             'barangay_id'  => 'required|exists:barangays,id', 
             'crop_id'      => 'required|exists:crops,id',
             'area'         => 'required|numeric|min:0.01',
@@ -64,7 +67,7 @@ class PlantingController extends Controller
         $planting = Planting::findOrFail($id);
 
         $validated = $request->validate([
-            'farmer_id'    => 'required|exists:farmers,id',
+            'farmer_id'    => 'nullable|exists:farmers,id',
             'barangay_id'  => 'required|exists:barangays,id', 
             'crop_id'      => 'required|exists:crops,id',
             'area'         => 'required|numeric|min:0.01',
