@@ -115,10 +115,11 @@ class ReportController extends Controller
         $data = $this->fetchReportData($report);
 
         return response()->json([
-            'headers'  => $data['headers'] ?? [],
-            'rows'     => $data['rows']    ?? [],
-            'total'    => $data['total']   ?? null,
-            'summary'  => $data['summary'] ?? null,
+            'headers'    => $data['headers']    ?? [],
+            'rows'       => $data['rows']       ?? [],
+            'total'      => $data['total']      ?? null,
+            'summary'    => $data['summary']    ?? null,
+            'site_label' => $data['site_label'] ?? null,
         ]);
     }
 
@@ -336,8 +337,8 @@ class ReportController extends Controller
             'Germination',
             'No. of Bagging',
             'No. of Seedlings Planted',
-            'Garden Soil',
-            'Disposal Seedlings',
+            'No. of Garden Soil',
+            'No. of Disposal Seedlings',
         ];
 
         $defaultCropItems = [
@@ -385,7 +386,10 @@ class ReportController extends Controller
             return $row;
         })->toArray();
 
-        return compact('headers', 'rows');
+        $siteCounts = $records->pluck('nursery_site')->filter(fn ($s) => !empty($s))->countBy();
+        $siteLabel  = $siteCounts->isEmpty() ? 'NURSERY SITE' : $siteCounts->sortDesc()->keys()->first();
+
+        return array_merge(compact('headers', 'rows'), ['site_label' => $siteLabel]);
     }
 
     private function fetchPlanting($from, $to): array
@@ -847,5 +851,7 @@ class ReportController extends Controller
         ];
     }
 }
+
+
 
 

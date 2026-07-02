@@ -53,7 +53,7 @@ class ReportExport implements FromArray, WithColumnWidths, WithDrawings, WithHea
 
     public function title(): string
     {
-        return substr($this->report->type, 0, 31);
+        return substr($this->report->module ?: $this->report->type, 0, 31);
     }
 
     public function drawings(): array
@@ -149,3 +149,4 @@ class ReportExport implements FromArray, WithColumnWidths, WithDrawings, WithHea
             ->format('M d, Y, h:i A');
     }
 }
+
