@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\PlantingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TechnicianLogController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -81,6 +82,8 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::get('employees/org-chart', [EmployeeController::class, 'orgChart']);
     Route::apiResource('employees', EmployeeController::class);
     Route::apiResource('technician-logs', TechnicianLogController::class);
+
+    Route::get('/notifications/recent', [NotificationController::class, 'recent']);
 
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);    // GET    /api/reports
