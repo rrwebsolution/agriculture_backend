@@ -11,7 +11,7 @@ class Farmer extends Model
 
     protected $fillable = [
         'system_id', 'rsbsa_no', 'first_name', 'middle_name', 'last_name', 'suffix', 'profile_photo_path',
-        'gender', 'dob', 'barangay_id', 'address_details', 'contact_no',
+        'gender', 'dob', 'civil_status', 'education', 'barangay_id', 'address_details', 'contact_no',
         'farm_barangay_id', 'farm_sitio', 'crop_id', 'ownership_type', 
         'total_area', 'farm_coordinates', 'soil_type', 'gpx_file_path',
         'topography', 'irrigation_type', 'area_breakdown',

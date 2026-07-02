@@ -10,6 +10,7 @@ use App\Models\Fisherfolk;
 use App\Models\FisheryRecord;
 use App\Models\Harvest;
 use App\Models\Inventory;
+use App\Models\NurseryRecord;
 use App\Models\Planting;
 use App\Models\Report;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -243,6 +244,21 @@ class ReportController extends Controller
         return $defaultUnit ? "{$formatted} {$defaultUnit}" : $formatted;
     }
 
+    private function quantityUnitValue(mixed $value): string
+    {
+        $normalized = is_string($value) ? trim($value) : (string) ($value ?? '');
+
+        if ($normalized === '') {
+            return 'Unspecified';
+        }
+
+        if (preg_match('/^[\d,]+(?:\.\d+)?\s+(.+)$/', $normalized, $matches)) {
+            return $this->textValue($matches[1], 'Unspecified');
+        }
+
+        return 'Unspecified';
+    }
+
     private function dateValue(mixed $value, string $fallback = 'Not Available'): string
     {
         if ($value instanceof \DateTimeInterface) {
@@ -254,6 +270,10 @@ class ReportController extends Controller
 
     private function fetchProduction($from, $to): array
     {
+        if ($this->currentReport?->module === 'Nursery Production Records') {
+            return $this->fetchNurseryProduction($from, $to);
+        }
+
         if ($this->currentReport?->module === 'Planting Records') {
             return $this->fetchPlanting($from, $to);
         }
@@ -272,10 +292,11 @@ class ReportController extends Controller
 
         $availableFields = [
             'farmer' => 'Farmer',
-            'crop' => 'Crop',
-            'barangay' => 'Barangay',
+            'crop' => 'Crop Planted',
+            'barangay' => 'Farm Location',
             'date_harvested' => 'Date Harvested',
-            'quantity' => 'Quantity',
+            'quantity' => 'Quantity / Yield',
+            'quantity_unit' => 'Unit',
             'quality' => 'Quality',
             'value' => 'Value (PHP)',
         ];
@@ -284,16 +305,87 @@ class ReportController extends Controller
             $availableFields,
             $harvests,
             fn ($h, $field) => match ($field) {
-                'farmer' => $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Unknown Farmer'),
+                'farmer' => $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Not specified'),
                 'crop' => $this->textValue($h->crop->name ?? $h->crop->category ?? null, 'Unknown Crop'),
                 'barangay' => $this->textValue($h->barangay->name ?? null, 'Unknown Barangay'),
                 'date_harvested' => $this->dateValue($h->dateHarvested, 'Unknown Date'),
                 'quantity' => $this->measurementValue($h->quantity),
+                'quantity_unit' => $this->quantityUnitValue($h->quantity),
                 'quality' => $this->textValue($h->quality, 'Unspecified'),
                 'value' => $this->numberValue($h->value),
                 default => '',
             }
         );
+    }
+
+    private function fetchNurseryProduction($from, $to): array
+    {
+        $filters = $this->currentReportFilters;
+        $records = NurseryRecord::query()
+            ->whereBetween('record_date', [$from, $to])
+            ->when(isset($filters['activity']), fn ($query) => $query->where('activity', $filters['activity']))
+            ->when(isset($filters['crop_item']), fn ($query) => $query->where('crop_item', $filters['crop_item']))
+            ->orderBy('activity')
+            ->orderBy('crop_item')
+            ->get();
+
+        $defaultActivities = [
+            'Collection of Scion',
+            'Collection of Seed',
+            'Collection of Seedlings',
+            'Germination',
+            'No. of Bagging',
+            'No. of Seedlings Planted',
+            'Garden Soil',
+            'Disposal Seedlings',
+        ];
+
+        $defaultCropItems = [
+            'Grafted Lemonsito',
+            'Grafted Suwa',
+            'Jackfruit',
+            'Mango Grafted',
+            'Avocado',
+            'Lanzones',
+            'Mangosteen',
+            'Labana',
+            'Durian',
+            'Pomelo/Seedling',
+            'Macopa/Cacao',
+            'Rambutan Grafted',
+            'Garden Soil',
+        ];
+
+        $activities = collect($defaultActivities)
+            ->merge($records->pluck('activity'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $cropItems = collect($defaultCropItems)
+            ->merge($records->pluck('crop_item'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $headers = array_merge(['Activities'], $cropItems->all(), ['Total']);
+        $rows = $activities->map(function ($activity) use ($records, $cropItems) {
+            $rowRecords = $records->where('activity', $activity);
+            $row = [$activity];
+            $total = 0;
+
+            foreach ($cropItems as $item) {
+                $quantity = (float) $rowRecords->where('crop_item', $item)->sum('quantity');
+                $total += $quantity;
+                $row[] = $quantity > 0 ? $this->numberValue($quantity, fmod($quantity, 1.0) === 0.0 ? 0 : 2) : '';
+            }
+
+            $row[] = $total > 0 ? $this->numberValue($total, fmod($total, 1.0) === 0.0 ? 0 : 2) : '';
+
+            return $row;
+        })->toArray();
+
+        return compact('headers', 'rows');
     }
 
     private function fetchPlanting($from, $to): array
@@ -311,10 +403,11 @@ class ReportController extends Controller
 
         $availableFields = [
             'farmer' => 'Farmer',
-            'crop_type' => 'Crop Type',
-            'growth_status' => 'Growth Status',
-            'barangay' => 'Barangay',
+            'crop_type' => 'Crop Category',
+            'growth_status' => 'Planting Status',
+            'barangay' => 'Farm Location',
             'date_planted' => 'Date Planted',
+            'est_harvest' => 'Estimated Harvest',
             'area' => 'Area (ha)',
         ];
 
@@ -322,11 +415,12 @@ class ReportController extends Controller
             $availableFields,
             $records,
             fn ($p, $field) => match ($field) {
-                'farmer' => $this->textValue(trim(($p->farmer->first_name ?? '') . ' ' . ($p->farmer->last_name ?? '')), 'Unknown Farmer'),
+                'farmer' => $this->textValue(trim(($p->farmer->first_name ?? '') . ' ' . ($p->farmer->last_name ?? '')), 'Not specified'),
                 'crop_type' => $this->textValue($p->crop->category ?? null, 'Unknown Crop'),
                 'growth_status' => $this->textValue($p->status, 'Unspecified'),
                 'barangay' => $this->textValue($p->barangay->name ?? null, 'Unknown Barangay'),
                 'date_planted' => $this->dateValue($p->date_planted, 'Unknown Date'),
+                'est_harvest' => $this->dateValue($p->est_harvest, 'Unknown Date'),
                 'area' => $this->measurementValue($p->area, 'ha', '0.00 ha'),
                 default => '',
             }
@@ -465,7 +559,10 @@ class ReportController extends Controller
         $availableFields = [
             'full_name' => 'Full Name',
             'gender' => 'Sex',
-            'barangay' => 'Barangay',
+            'civil_status' => 'Civil Status',
+            'education' => 'Education',
+            'barangay' => 'Residence Barangay',
+            'address_details' => 'Address Details',
             'contact_no' => 'Contact No.',
             'primary_crop' => 'Primary Crop',
             'farm_area' => 'Farm Area (ha)',
@@ -480,7 +577,10 @@ class ReportController extends Controller
             fn ($f, $field) => match ($field) {
                 'full_name' => $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Farmer'),
                 'gender' => $this->textValue($f->gender, 'Unspecified'),
+                'civil_status' => $this->textValue($f->civil_status, 'Unspecified'),
+                'education' => $this->textValue($f->education, 'Unspecified'),
                 'barangay' => $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
+                'address_details' => $this->textValue($f->address_details, 'No Address Details'),
                 'contact_no' => $this->textValue($f->contact_no, 'No Contact'),
                 'primary_crop' => $this->textValue($f->crop->name ?? $f->crop->category ?? null, 'Unknown Crop'),
                 'farm_area' => $this->numberValue($f->total_area),
@@ -511,7 +611,10 @@ class ReportController extends Controller
         $availableFields = [
             'full_name' => 'Full Name',
             'gender' => 'Sex',
-            'barangay' => 'Barangay',
+            'civil_status' => 'Civil Status',
+            'education' => 'Education',
+            'barangay' => 'Residence Barangay',
+            'address_details' => 'Address Details',
             'contact_no' => 'Contact No.',
             'fisher_type' => 'Fisher Type',
             'years_in_fishing' => 'Years in Fishing',
@@ -524,7 +627,10 @@ class ReportController extends Controller
             fn ($f, $field) => match ($field) {
                 'full_name' => $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Fisherfolk'),
                 'gender' => $this->textValue($f->gender, 'Unspecified'),
+                'civil_status' => $this->textValue($f->civil_status, 'Unspecified'),
+                'education' => $this->textValue($f->education, 'Unspecified'),
                 'barangay' => $this->textValue($f->barangay->name ?? null, 'Unknown Barangay'),
+                'address_details' => $this->textValue($f->address_details, 'No Address Details'),
                 'contact_no' => $this->textValue($f->contact_no, 'No Contact'),
                 'fisher_type' => $this->textValue($f->fisher_type, 'Unspecified'),
                 'years_in_fishing' => $this->measurementValue($f->years_in_fishing, 'yrs', '0.00 yrs'),
@@ -658,6 +764,7 @@ class ReportController extends Controller
         return match ($report->module) {
             'Harvest Records' => $this->fetchProduction($report->period_from, $report->period_to),
             'Planting Records' => $this->fetchPlanting($report->period_from, $report->period_to),
+            'Nursery Production Records' => $this->fetchNurseryProduction($report->period_from, $report->period_to),
             'Fish Catch Data' => $this->fetchFishery($report->period_from, $report->period_to),
             'Farmer Registry' => $this->fetchCensus(),
             'Fisherfolk Registry' => $this->fetchFisherfolkRegistry(),
@@ -686,6 +793,7 @@ class ReportController extends Controller
         $byModule = match ($module) {
             'Harvest Records' => $this->dateRangeFromModel(Harvest::query(), 'dateHarvested'),
             'Planting Records' => $this->dateRangeFromModel(Planting::query(), 'date_planted'),
+            'Nursery Production Records' => $this->dateRangeFromModel(NurseryRecord::query(), 'record_date'),
             'Fish Catch Data' => $this->dateRangeFromModel(FisheryRecord::query(), 'date'),
             'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
             'Farmer Registry' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),

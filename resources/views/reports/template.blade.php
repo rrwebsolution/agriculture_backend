@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #1a1a1a; padding: 24px; }
+  body { font-family: DejaVu Sans, sans-serif; font-size: 9px; color: #1a1a1a; padding: 24px; }
 
   .header { margin-bottom: 20px; border-bottom: 2px solid #2D6A4F; padding-bottom: 12px; }
   .header-table { width: 100%; border: 0; margin: 0; border-collapse: collapse; }
@@ -17,10 +17,10 @@
   .header .title  { font-size: 15px; font-weight: bold; text-transform: uppercase; margin: 4px 0; }
   .header .meta   { font-size: 9px; color: #555; }
 
-  table { width: 100%; border-collapse: collapse; margin-top: 14px; border: 1px solid #d1d5db; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; border: 1px solid #d1d5db; table-layout: fixed; }
   thead tr { background-color: #2D6A4F; color: #fff; }
   th { padding: 7px 8px; border: 1px solid #d1d5db; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 6px 8px; border: 1px solid #d1d5db; vertical-align: top; }
+  td { padding: 6px 8px; border: 1px solid #d1d5db; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
   tr:nth-child(even) td { background-color: #f9fafb; }
 
   .totals-row td { font-weight: bold; border-top: 2px solid #2D6A4F; background: #f0fdf4; }

@@ -71,6 +71,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/users-reset-password/*',
             'api/danger-zones',
             'api/danger-zones/*',
+            'api/nursery-records',
+            'api/nursery-records/*',
 
 
 

@@ -122,6 +122,8 @@ class FarmerController extends Controller
 
         $request->validate([
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
+            'civil_status' => ['required', 'string', 'max:255'],
+            'education' => ['nullable', 'string', 'max:255'],
             'is_farm_worker' => ['required', 'boolean'],
             'farms_list' => $isFarmWorker ? ['nullable', 'array', 'max:0'] : ['required', 'array', 'min:1'],
             'farms_list.*.farm_barangay_id' => ['required'],

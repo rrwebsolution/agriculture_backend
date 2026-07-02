@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\FisheryController;
 use App\Http\Controllers\Api\FisheryRecordController;
 use App\Http\Controllers\Api\HarvestController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\NurseryRecordController;
 use App\Http\Controllers\Api\PlantingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
@@ -61,6 +62,8 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::apiResource('fisherfolks', FisherfolkController::class);
     Route::apiResource('clusters', ClusterController::class);
     Route::apiResource('plantings', PlantingController::class);
+    Route::apiResource('nursery-records', NurseryRecordController::class)
+        ->parameters(['nursery-records' => 'nurseryRecord']);
     Route::delete('/planting-history/{id}', [PlantingController::class, 'destroyHistory']);
     Route::get('/dashboard/stats', [DashboardController::class, 'index']);
     Route::apiResource('harvests', HarvestController::class);

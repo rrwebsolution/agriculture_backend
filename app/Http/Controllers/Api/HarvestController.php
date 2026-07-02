@@ -22,7 +22,7 @@ class HarvestController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'farmer_id' => 'required|exists:farmers,id',
+            'farmer_id' => 'nullable|exists:farmers,id',
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
             'dateHarvested' => 'required|date',
@@ -48,7 +48,7 @@ class HarvestController extends Controller
         $harvest = Harvest::findOrFail($id);
 
         $validated = $request->validate([
-            'farmer_id' => 'required|exists:farmers,id',
+            'farmer_id' => 'nullable|exists:farmers,id',
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
             'dateHarvested' => 'required|date',
