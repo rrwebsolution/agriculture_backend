@@ -55,7 +55,7 @@
       ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
       : null;
     $footerLabel = $footerLabel ?? 'Generated';
-    $isNurseryProduction = $report->module === 'Nursery Production Records';
+    $isNurseryProduction = $report->module === 'City Plant Nursery Production Records';
   @endphp
 
   <div class="header">

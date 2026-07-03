@@ -271,7 +271,7 @@ class ReportController extends Controller
 
     private function fetchProduction($from, $to): array
     {
-        if ($this->currentReport?->module === 'Nursery Production Records') {
+        if ($this->currentReport?->module === 'City Plant Nursery Production Records') {
             return $this->fetchNurseryProduction($from, $to);
         }
 
@@ -768,7 +768,7 @@ class ReportController extends Controller
         return match ($report->module) {
             'Harvest Records' => $this->fetchProduction($report->period_from, $report->period_to),
             'Planting Records' => $this->fetchPlanting($report->period_from, $report->period_to),
-            'Nursery Production Records' => $this->fetchNurseryProduction($report->period_from, $report->period_to),
+            'City Plant Nursery Production Records' => $this->fetchNurseryProduction($report->period_from, $report->period_to),
             'Fish Catch Data' => $this->fetchFishery($report->period_from, $report->period_to),
             'Farmer Registry' => $this->fetchCensus(),
             'Fisherfolk Registry' => $this->fetchFisherfolkRegistry(),
@@ -797,7 +797,7 @@ class ReportController extends Controller
         $byModule = match ($module) {
             'Harvest Records' => $this->dateRangeFromModel(Harvest::query(), 'dateHarvested'),
             'Planting Records' => $this->dateRangeFromModel(Planting::query(), 'date_planted'),
-            'Nursery Production Records' => $this->dateRangeFromModel(NurseryRecord::query(), 'record_date'),
+            'City Plant Nursery Production Records' => $this->dateRangeFromModel(NurseryRecord::query(), 'record_date'),
             'Fish Catch Data' => $this->dateRangeFromModel(FisheryRecord::query(), 'date'),
             'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
             'Farmer Registry' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),
