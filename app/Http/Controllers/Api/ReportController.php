@@ -326,70 +326,100 @@ class ReportController extends Controller
             ->whereBetween('record_date', [$from, $to])
             ->when(isset($filters['activity']), fn ($query) => $query->where('activity', $filters['activity']))
             ->when(isset($filters['crop_item']), fn ($query) => $query->where('crop_item', $filters['crop_item']))
-            ->orderBy('activity')
-            ->orderBy('crop_item')
+            ->orderBy('record_date')
             ->get();
 
-        $defaultActivities = [
-            'Collection of Scion',
-            'Collection of Seed',
-            'Collection of Seedlings',
-            'Germination',
-            'No. of Bagging',
-            'No. of Seedlings Planted',
-            'No. of Garden Soil',
-            'No. of Disposal Seedlings',
-        ];
+        $rows = [];
 
-        $defaultCropItems = [
-            'Grafted Lemonsito',
-            'Grafted Suwa',
-            'Jackfruit',
-            'Mango Grafted',
-            'Avocado',
-            'Lanzones',
-            'Mangosteen',
-            'Labana',
-            'Durian',
-            'Pomelo/Seedling',
-            'Macopa/Cacao',
-            'Rambutan Grafted',
-            'Garden Soil',
-        ];
+        $collectionSummary = $records
+            ->filter(fn ($record) => ($record->metadata['section'] ?? null) === 'Collection of Scion/Seeds/Seedlings')
+            ->groupBy(fn ($record) => ($record->metadata['month'] ?? $record->record_date?->format('Y-m')) . '|' . ($record->metadata['category'] ?? $record->activity));
 
-        $activities = collect($defaultActivities)
-            ->merge($records->pluck('activity'))
-            ->filter()
-            ->unique()
-            ->values();
+        foreach ($collectionSummary as $key => $items) {
+            [$month, $category] = explode('|', $key);
+            $rows[] = [
+                'Summary of Collection',
+                $this->formatReportMonth($month),
+                $category,
+                'Total Collected',
+                $this->numberValue($items->sum('quantity'), 0) . ' ' . ($items->first()->unit ?? ''),
+            ];
+        }
 
-        $cropItems = collect($defaultCropItems)
-            ->merge($records->pluck('crop_item'))
-            ->filter()
-            ->unique()
-            ->values();
+        $germinationRecords = $records
+            ->filter(fn ($record) => ($record->metadata['section'] ?? null) === 'Germination of Seeds');
 
-        $headers = array_merge(['Activities'], $cropItems->all(), ['Total']);
-        $rows = $activities->map(function ($activity) use ($records, $cropItems) {
-            $rowRecords = $records->where('activity', $activity);
-            $row = [$activity];
-            $total = 0;
+        $totalSeedsPlanted = $germinationRecords->sum(fn ($record) => (float) ($record->metadata['total_seeds_planted'] ?? 0));
+        $totalGerminated = $germinationRecords->sum(fn ($record) => (float) ($record->metadata['total_germinated'] ?? $record->quantity));
+        $germinationRate = $totalSeedsPlanted > 0 ? ($totalGerminated / $totalSeedsPlanted) * 100 : 0;
 
-            foreach ($cropItems as $item) {
-                $quantity = (float) $rowRecords->where('crop_item', $item)->sum('quantity');
-                $total += $quantity;
-                $row[] = $quantity > 0 ? $this->numberValue($quantity, fmod($quantity, 1.0) === 0.0 ? 0 : 2) : '';
+        if ($germinationRecords->isNotEmpty()) {
+            $rows[] = ['Germination Summary & Status', 'All', 'Total seeds sown/planted', 'All species combined', $this->numberValue($totalSeedsPlanted, 0) . ' seeds'];
+            $rows[] = ['Germination Summary & Status', 'All', 'Total seeds germinated', 'Up to reporting date', $this->numberValue($totalGerminated, 0) . ' seeds'];
+            $rows[] = ['Germination Summary & Status', 'All', 'Average germination rate', '(Total germinated / Total sown) x 100', $this->numberValue($germinationRate, 1) . '%'];
+            $rows[] = ['Germination Summary & Status', 'All', 'Failed / non-germinated', 'Computed balance', $this->numberValue(max(0, $totalSeedsPlanted - $totalGerminated), 0) . ' seeds'];
+        }
+
+        $baggingRecords = $records
+            ->filter(fn ($record) => ($record->metadata['section'] ?? null) === 'Soil / Potting Media Bagging');
+
+        $totalBagsPrepared = $baggingRecords
+            ->filter(fn ($record) => ($record->metadata['entry_type'] ?? null) === 'Bagging Production Record')
+            ->sum(fn ($record) => (float) ($record->metadata['quantity_bagged'] ?? $record->quantity));
+
+        if ($baggingRecords->isNotEmpty()) {
+            $rows[] = ['Inventory & Usage Summary', 'All', 'Total bags prepared', 'Small + Medium + Large + XL', $this->numberValue($totalBagsPrepared, 0) . ' pcs'];
+            foreach ($baggingRecords->filter(fn ($record) => ($record->metadata['entry_type'] ?? null) === 'Mixture Composition') as $record) {
+                $rows[] = [
+                    'Inventory & Usage Summary',
+                    $this->formatReportMonth($record->metadata['month'] ?? null),
+                    $record->metadata['component'] ?? $record->crop_item,
+                    trim(($record->metadata['specification'] ?? '') . ' ' . ($record->metadata['proportion'] ?? '')),
+                    $record->metadata['cost_per_unit'] ? ('PHP ' . $this->numberValue($record->metadata['cost_per_unit'])) : 'Not specified',
+                ];
             }
+        }
 
-            $row[] = $total > 0 ? $this->numberValue($total, fmod($total, 1.0) === 0.0 ? 0 : 2) : '';
+        $inventoryItems = Inventory::with('transactions')
+            ->where(function ($query) {
+                $query->where('category', 'City Plant Nursery Production')
+                    ->orWhere('commodity', 'City Plant Nursery Production')
+                    ->orWhere('remarks', 'like', '%City Plant Nursery Production%');
+            })
+            ->get();
 
-            return $row;
-        })->toArray();
+        foreach ($inventoryItems as $item) {
+            $distributed = $item->transactions
+                ->where('type', 'OUT')
+                ->filter(fn ($transaction) => $transaction->transaction_date >= $from && $transaction->transaction_date <= $to)
+                ->sum('quantity');
 
-        $siteCounts = $records->pluck('nursery_site')->filter(fn ($s) => !empty($s))->countBy();
-        $siteLabel  = $siteCounts->isEmpty() ? 'NURSERY SITE' : $siteCounts->sortDesc()->keys()->first();
+            $rows[] = [
+                'Production Output',
+                (string) ($item->year ?? 'N/A'),
+                $item->name,
+                'Distributed / Issued: ' . $this->numberValue($distributed, 0) . ' ' . $item->unit,
+                'Stock on Hand: ' . $this->numberValue($item->stock, 0) . ' ' . $item->unit,
+            ];
+        }
 
-        return array_merge(compact('headers', 'rows'), ['site_label' => $siteLabel]);
+        return [
+            'headers' => ['Report Section', 'Month / Period', 'Category / Item', 'Details', 'Figures'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function formatReportMonth(?string $month): string
+    {
+        if (!$month) {
+            return 'N/A';
+        }
+
+        try {
+            return Carbon::parse($month . '-01')->format('M Y');
+        } catch (\Throwable) {
+            return $month;
+        }
     }
 
     private function fetchPlanting($from, $to): array
@@ -797,7 +827,7 @@ class ReportController extends Controller
         $byModule = match ($module) {
             'Harvest Records' => $this->dateRangeFromModel(Harvest::query(), 'dateHarvested'),
             'Planting Records' => $this->dateRangeFromModel(Planting::query(), 'date_planted'),
-            'City Plant Nursery Production Records' => $this->dateRangeFromModel(NurseryRecord::query(), 'record_date'),
+            'City Plant Nursery Production Records' => $this->nurseryProductionDateRange(),
             'Fish Catch Data' => $this->dateRangeFromModel(FisheryRecord::query(), 'date'),
             'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
             'Farmer Registry' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),
@@ -832,6 +862,28 @@ class ReportController extends Controller
         ];
     }
 
+    private function nurseryProductionDateRange(): array
+    {
+        $nurseryRange = $this->dateRangeFromModel(NurseryRecord::query(), 'record_date');
+        $inventoryRange = $this->dateRangeFromModel(
+            Inventory::query()->where(function ($query) {
+                $query->where('category', 'City Plant Nursery Production')
+                    ->orWhere('commodity', 'City Plant Nursery Production')
+                    ->orWhere('remarks', 'like', '%City Plant Nursery Production%');
+            }),
+            'created_at'
+        );
+
+        $dates = array_values(array_filter([...$nurseryRange, ...$inventoryRange]));
+        if (empty($dates)) {
+            return [null, null];
+        }
+
+        sort($dates);
+
+        return [$dates[0], $dates[count($dates) - 1]];
+    }
+
     private function normalizeDateBoundary(mixed $value): ?string
     {
         if (empty($value)) {
@@ -851,7 +903,4 @@ class ReportController extends Controller
         ];
     }
 }
-
-
-
 

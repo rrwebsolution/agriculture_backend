@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -28,17 +28,6 @@
   .footer { margin-top: 24px; font-size: 9px; color: #888; }
   .no-data { text-align: center; padding: 24px; color: #888; font-style: italic; }
   .summary { margin-top: 10px; font-size: 9px; color: #555; }
-  .nursery-matrix-table { border-collapse: collapse; width: 100%; table-layout: auto; margin-top: 14px; }
-  .nursery-matrix-table th, .nursery-matrix-table td { border: 1px solid #d1d5db; vertical-align: middle; }
-  .act-header   { text-align: left; font-weight: bold; font-size: 9pt; background: #2D6A4F; color: #fff; min-width: 155px; padding: 7px 9px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .site-header  { text-align: center; font-weight: bold; font-size: 10pt; background: #2D6A4F; color: #fff; padding: 7px 9px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .crop-header  { text-align: center; font-weight: bold; font-size: 7.5px; background: #2D6A4F; color: #fff; min-width: 55px; word-break: break-word; padding: 6px 4px; text-transform: uppercase; }
-  .total-header { text-align: center; font-weight: bold; font-size: 9pt; background: #2D6A4F; color: #fff; min-width: 55px; padding: 7px 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .act-cell   { text-align: left; font-size: 8.5px; padding: 7px 9px; }
-  .num-cell   { text-align: center; font-size: 9px; padding: 6px 5px; }
-  .total-cell { text-align: center; font-weight: bold; font-size: 9px; padding: 6px 5px; background: #f0fdf4; }
-  .grand-row td { font-weight: bold; background: #f0fdf4; border-top: 2px solid #2D6A4F; font-size: 9px; text-align: center; padding: 7px 5px; }
-  .grand-label  { text-align: left !important; padding-left: 9px !important; }
   .summary-grid { margin-top: 12px; width: 100%; }
   .summary-grid td { border: 1px solid #d1d5db; padding: 8px; background: #f8fafc; }
   .summary-label { font-size: 8px; text-transform: uppercase; color: #6b7280; }
@@ -55,7 +44,6 @@
       ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
       : null;
     $footerLabel = $footerLabel ?? 'Generated';
-    $isNurseryProduction = $report->module === 'City Plant Nursery Production Records';
   @endphp
 
   <div class="header">
@@ -104,49 +92,7 @@
 
   @if(empty($data['rows']))
     <div class="no-data">No records found for the selected period.</div>
-  @elseif($isNurseryProduction)
-    @php
-      $nurseryHeaders  = $data['headers'] ?? [];
-      $nurseryCropCols = array_slice($nurseryHeaders, 1, -1);
-      $nurseryRows     = $data['rows'] ?? [];
-      $siteLabel       = strtoupper($data['site_label'] ?? 'NURSERY SITE');
-
-      $colTotals  = array_fill(0, count($nurseryCropCols), 0.0);
-      $grandTotal = 0.0;
-      foreach ($nurseryRows as $row) {
-          $lastIdx = count($row) - 1;
-          foreach ($row as $ci => $cell) {
-              $numVal = (float) str_replace(',', '', $cell);
-              if ($ci >= 1 && $ci < $lastIdx) {
-                  $colTotals[$ci - 1] += $numVal;
-              }
-              if ($ci === $lastIdx) {
-                  $grandTotal += $numVal;
-              }
-          }
-      }
-      $fmtNum = fn($v) => $v > 0 ? number_format($v, fmod($v, 1.0) === 0.0 ? 0 : 2) : '';
-    @endphp
-    <table class="nursery-matrix-table">
-      <thead>
-        <tr>
-          <th rowspan="2" class="act-header">ACTIVITIES</th>
-          <th colspan="{{ count($nurseryCropCols) }}" class="site-header">{{ $siteLabel }}</th>
-          <th rowspan="2" class="total-header">TOTAL</th>
-        </tr>
-        <tr>
-          @foreach($nurseryCropCols as $crop)
-            <th class="crop-header">{{ $crop }}</th>
-          @endforeach
-        </tr>
-      </thead>
-      <tbody>
-        @foreach($nurseryRows as $ri => $row)
-          <tr>
-            @foreach($row as $ci => $cell)
-              @if($ci === 0)
-                <td class="act-cell">{{ ($ri + 1) . '. ' . $cell }}</td>
-              @elseif($ci === count($row) - 1)
+  @elseif($ci === count($row) - 1)
                 <td class="total-cell">{{ $cell }}</td>
               @else
                 <td class="num-cell">{{ $cell }}</td>
@@ -200,6 +146,4 @@
 
 </body>
 </html>
-
-
 

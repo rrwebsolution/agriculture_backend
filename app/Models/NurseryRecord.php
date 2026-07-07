@@ -17,10 +17,12 @@ class NurseryRecord extends Model
         'unit',
         'nursery_site',
         'remarks',
+        'metadata',
     ];
 
     protected $casts = [
         'record_date' => 'date',
         'quantity' => 'decimal:2',
+        'metadata' => 'array',
     ];
 }

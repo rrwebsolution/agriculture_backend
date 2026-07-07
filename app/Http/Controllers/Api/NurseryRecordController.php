@@ -54,6 +54,7 @@ class NurseryRecordController extends Controller
             'unit' => ['required', 'string', 'max:50'],
             'nursery_site' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string', 'max:1000'],
+            'metadata' => ['nullable', 'array'],
         ]);
     }
 }
