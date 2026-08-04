@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Events\BarangayUpdated;
 use App\Events\CropUpdated;
 use App\Events\FarmerUpdated;
+use App\Events\PlantingUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Barangay;
 use App\Models\Crop;
@@ -54,6 +55,7 @@ class FarmerController extends Controller
         }
 
         $normalized = str_replace(',', '', (string) $value);
+
         return is_numeric($normalized) ? number_format((float) $normalized, 2, '.', '') : $normalized;
     }
 
@@ -61,7 +63,7 @@ class FarmerController extends Controller
     {
         $assistances = $request->input('assistances_list');
 
-        if (!is_array($assistances)) {
+        if (! is_array($assistances)) {
             return;
         }
 
@@ -90,13 +92,13 @@ class FarmerController extends Controller
 
     private function storeProfilePhoto(Request $request, ?Farmer $farmer = null): ?string
     {
-        if (!$request->hasFile('profile_photo')) {
+        if (! $request->hasFile('profile_photo')) {
             return $farmer?->profile_photo_path;
         }
 
         $file = $request->file('profile_photo');
         $directory = public_path('uploads/profile-photos/farmers');
-        if (!File::exists($directory)) {
+        if (! File::exists($directory)) {
             File::makeDirectory($directory, 0755, true);
         }
 
@@ -104,10 +106,10 @@ class FarmerController extends Controller
             File::delete(public_path($farmer->profile_photo_path));
         }
 
-        $filename = uniqid('farmer_', true) . '.' . $file->getClientOriginalExtension();
+        $filename = uniqid('farmer_', true).'.'.$file->getClientOriginalExtension();
         $file->move($directory, $filename);
 
-        return 'uploads/profile-photos/farmers/' . $filename;
+        return 'uploads/profile-photos/farmers/'.$filename;
     }
 
     private function validateFarmProfile(Request $request): void
@@ -121,7 +123,7 @@ class FarmerController extends Controller
         }
 
         $request->validate([
-            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PROFILE_PHOTO_MAX_KB],
             'civil_status' => ['nullable', 'string', 'max:255'],
             'education' => ['nullable', 'string', 'max:255'],
             'is_farm_worker' => ['required', 'boolean'],
@@ -182,12 +184,12 @@ class FarmerController extends Controller
             $b = Barangay::findOrFail($barangay_id);
 
             $formatted = [
-                'id'                 => $b->id,
-                'name'               => $b->name,
-                'code'               => $b->code,
-                'type'               => $b->type,
-                'farmers'            => $b->farmers()->count(),
-                'fisherfolks'        => $b->fisherfolks()->count(),
+                'id' => $b->id,
+                'name' => $b->name,
+                'code' => $b->code,
+                'type' => $b->type,
+                'farmers' => $b->farmers()->count(),
+                'fisherfolks' => $b->fisherfolks()->count(),
                 'cooperatives_count' => $b->cooperatives()->count(),
             ];
 
@@ -217,7 +219,7 @@ class FarmerController extends Controller
             $data['cooperative_id'] = json_decode($data['cooperative_id'], true);
         }
 
-        if (!empty($data['farms_list']) && count($data['farms_list']) > 0) {
+        if (! empty($data['farms_list']) && count($data['farms_list']) > 0) {
             $firstFarm = $data['farms_list'][0];
             $data['farm_barangay_id'] = $firstFarm['farm_barangay_id'] ?? null;
             $data['farm_sitio'] = $firstFarm['farm_sitio'] ?? null;
@@ -242,7 +244,7 @@ class FarmerController extends Controller
             $data['gpx_file_path'] = null;
         }
 
-        if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
+        if (! empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
             $firstProgram = $data['assistances_list'][0];
             $data['program_name'] = $firstProgram['program_name'] ?? null;
             $data['assistance_type'] = $firstProgram['assistance_type'] ?? null;
@@ -280,7 +282,7 @@ class FarmerController extends Controller
             $data['cooperative_id'] = json_decode($data['cooperative_id'], true);
         }
 
-        if (!empty($data['farms_list']) && count($data['farms_list']) > 0) {
+        if (! empty($data['farms_list']) && count($data['farms_list']) > 0) {
             $firstFarm = $data['farms_list'][0];
             $data['farm_barangay_id'] = $firstFarm['farm_barangay_id'] ?? null;
             $data['farm_sitio'] = $firstFarm['farm_sitio'] ?? null;
@@ -305,7 +307,7 @@ class FarmerController extends Controller
             $data['gpx_file_path'] = null;
         }
 
-        if (!empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
+        if (! empty($data['assistances_list']) && count($data['assistances_list']) > 0) {
             $firstProgram = $data['assistances_list'][0];
             $data['program_name'] = $firstProgram['program_name'] ?? null;
             $data['assistance_type'] = $firstProgram['assistance_type'] ?? null;
@@ -322,7 +324,7 @@ class FarmerController extends Controller
 
         $farmer->plantings->each(function ($planting) {
             $p = $planting->fresh(['barangay', 'crop', 'statusHistory']);
-            event(new \App\Events\PlantingUpdated($p, 'updated'));
+            event(new PlantingUpdated($p, 'updated'));
         });
 
         $this->syncRealtimeMetrics($farmer->crop_id, $farmer->barangay_id);
@@ -342,6 +344,24 @@ class FarmerController extends Controller
     public function destroy($id)
     {
         $farmer = Farmer::findOrFail($id);
+
+        $harvestCount = $farmer->harvests()->count();
+        $plantingCount = $farmer->plantings()->count();
+
+        if ($harvestCount > 0 || $plantingCount > 0) {
+            $linked = [];
+            if ($plantingCount > 0) {
+                $linked[] = "{$plantingCount} planting log(s)";
+            }
+            if ($harvestCount > 0) {
+                $linked[] = "{$harvestCount} harvest record(s)";
+            }
+
+            return response()->json([
+                'message' => 'This farmer cannot be deleted because they already have '.implode(' and ', $linked).' in the system. Mark them as inactive instead.',
+            ], 422);
+        }
+
         $crop_id = $farmer->crop_id;
         $brgy_id = $farmer->barangay_id;
         $coopIds = $this->parseCooperativeIds($farmer->cooperative_id);
@@ -355,9 +375,3 @@ class FarmerController extends Controller
         return response()->json(['message' => 'Farmer deleted']);
     }
 }
-
-
-
-
-
-

@@ -47,7 +47,7 @@ class FisherfolkController extends Controller
 
     private function broadcastBarangayUpdate($barangay_id)
     {
-        if (!$barangay_id) {
+        if (! $barangay_id) {
             return;
         }
 
@@ -57,7 +57,7 @@ class FisherfolkController extends Controller
             'farmers.farmLocation',
             'fisherfolks.barangay',
             'fisherfolks.catchRecords',
-            'cooperatives'
+            'cooperatives',
         ])->findOrFail($barangay_id);
 
         event(new BarangayUpdated([
@@ -70,7 +70,7 @@ class FisherfolkController extends Controller
             'cooperatives_count' => $b->cooperatives->count(),
             'farmersList' => $b->farmers,
             'fisherfolksList' => $b->fisherfolks,
-            'cooperativesList' => $b->cooperatives
+            'cooperativesList' => $b->cooperatives,
         ], 'updated'));
     }
 
@@ -90,13 +90,13 @@ class FisherfolkController extends Controller
 
     private function storeProfilePhoto(Request $request, ?Fisherfolk $fisher = null): ?string
     {
-        if (!$request->hasFile('profile_photo')) {
+        if (! $request->hasFile('profile_photo')) {
             return $fisher?->profile_photo_path;
         }
 
         $file = $request->file('profile_photo');
         $directory = public_path('uploads/profile-photos/fisherfolks');
-        if (!File::exists($directory)) {
+        if (! File::exists($directory)) {
             File::makeDirectory($directory, 0755, true);
         }
 
@@ -104,15 +104,16 @@ class FisherfolkController extends Controller
             File::delete(public_path($fisher->profile_photo_path));
         }
 
-        $filename = uniqid('fisherfolk_', true) . '.' . $file->getClientOriginalExtension();
+        $filename = uniqid('fisherfolk_', true).'.'.$file->getClientOriginalExtension();
         $file->move($directory, $filename);
 
-        return 'uploads/profile-photos/fisherfolks/' . $filename;
+        return 'uploads/profile-photos/fisherfolks/'.$filename;
     }
 
     public function index()
     {
         $records = Fisherfolk::with(['barangay', 'catchRecords'])->latest()->get();
+
         return response()->json(['status' => 'success', 'data' => $records]);
     }
 
@@ -122,7 +123,7 @@ class FisherfolkController extends Controller
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', []));
 
         $validated = $request->validate([
-            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PROFILE_PHOTO_MAX_KB],
             'system_id' => 'required|unique:fisherfolks,system_id',
             'first_name' => 'required|string',
             'last_name' => 'required|string',
@@ -140,7 +141,7 @@ class FisherfolkController extends Controller
             'permit_date_issued' => 'required|date',
             'permit_expiry' => 'required|date',
             'inspection_status' => 'required|string',
-            'status' => 'required|in:active,inactive'
+            'status' => 'required|in:active,inactive',
         ], [
             'profile_photo.max' => 'Profile photo must not be greater than 2MB.',
         ]);
@@ -159,7 +160,7 @@ class FisherfolkController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Fisherfolk registered successfully!',
-            'data' => $fisher
+            'data' => $fisher,
         ], 201);
     }
 
@@ -172,7 +173,7 @@ class FisherfolkController extends Controller
         $newCoopIds = $this->parseCooperativeIds($request->input('cooperative_id', $fisher->cooperative_id));
 
         $validated = $request->validate([
-            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:' . self::PROFILE_PHOTO_MAX_KB],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PROFILE_PHOTO_MAX_KB],
             'first_name' => 'sometimes|required|string',
             'last_name' => 'sometimes|required|string',
             'gender' => 'sometimes|required|string',
@@ -189,7 +190,7 @@ class FisherfolkController extends Controller
             'permit_date_issued' => 'sometimes|required|date',
             'permit_expiry' => 'sometimes|required|date',
             'inspection_status' => 'sometimes|required|string',
-            'status' => 'sometimes|required|in:active,inactive'
+            'status' => 'sometimes|required|in:active,inactive',
         ], [
             'profile_photo.max' => 'Profile photo must not be greater than 2MB.',
         ]);
@@ -212,13 +213,22 @@ class FisherfolkController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Fisherfolk record updated!',
-            'data' => $fisher
+            'data' => $fisher,
         ]);
     }
 
     public function destroy($id)
     {
         $fisher = Fisherfolk::findOrFail($id);
+
+        $catchRecordCount = $fisher->catchRecords()->count();
+
+        if ($catchRecordCount > 0) {
+            return response()->json([
+                'message' => "This fisherfolk cannot be deleted because they already have {$catchRecordCount} fishery/catch record(s) in the system. Mark them as inactive instead.",
+            ], 422);
+        }
+
         $brgy_id = $fisher->barangay_id;
         $coopIds = $this->parseCooperativeIds($fisher->cooperative_id);
 
@@ -231,7 +241,7 @@ class FisherfolkController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Record deleted successfully.'
+            'message' => 'Record deleted successfully.',
         ]);
     }
 }
