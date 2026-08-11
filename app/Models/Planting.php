@@ -13,6 +13,7 @@ class Planting extends Model
         'farmer_id',
         'barangay_id', // 🌟 Changed from cluster_id
         'crop_id',
+        'crop_variety',
         'area',
         'date_planted',
         'est_harvest',
