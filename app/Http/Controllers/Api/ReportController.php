@@ -294,6 +294,7 @@ class ReportController extends Controller
         $availableFields = [
             'farmer' => 'Farmer',
             'crop' => 'Crop Planted',
+            'crop_variety' => 'Type / Variety',
             'barangay' => 'Farm Location',
             'date_harvested' => 'Date Harvested',
             'quantity' => 'Quantity / Yield',
@@ -308,6 +309,7 @@ class ReportController extends Controller
             fn ($h, $field) => match ($field) {
                 'farmer' => $this->textValue(trim(($h->farmer->first_name ?? '') . ' ' . ($h->farmer->last_name ?? '')), 'Not specified'),
                 'crop' => $this->textValue($h->crop->name ?? $h->crop->category ?? null, 'Unknown Crop'),
+                'crop_variety' => $this->textValue($h->crop_variety, 'Unspecified'),
                 'barangay' => $this->textValue($h->barangay->name ?? null, 'Unknown Barangay'),
                 'date_harvested' => $this->dateValue($h->dateHarvested, 'Unknown Date'),
                 'quantity' => $this->measurementValue($h->quantity),
@@ -438,6 +440,7 @@ class ReportController extends Controller
         $availableFields = [
             'farmer' => 'Farmer',
             'crop_type' => 'Crop Category',
+            'crop_variety' => 'Type / Variety',
             'growth_status' => 'Planting Status',
             'barangay' => 'Farm Location',
             'date_planted' => 'Date Planted',
@@ -451,6 +454,7 @@ class ReportController extends Controller
             fn ($p, $field) => match ($field) {
                 'farmer' => $this->textValue(trim(($p->farmer->first_name ?? '') . ' ' . ($p->farmer->last_name ?? '')), 'Not specified'),
                 'crop_type' => $this->textValue($p->crop->category ?? null, 'Unknown Crop'),
+                'crop_variety' => $this->textValue($p->crop_variety, 'Unspecified'),
                 'growth_status' => $this->textValue($p->status, 'Unspecified'),
                 'barangay' => $this->textValue($p->barangay->name ?? null, 'Unknown Barangay'),
                 'date_planted' => $this->dateValue($p->date_planted, 'Unknown Date'),
@@ -903,4 +907,3 @@ class ReportController extends Controller
         ];
     }
 }
-
