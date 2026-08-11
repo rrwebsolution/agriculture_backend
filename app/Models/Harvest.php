@@ -10,7 +10,8 @@ class Harvest extends Model
     use HasFactory;
 
     protected $fillable = [
-        'farmer_id', 'barangay_id', 'crop_id', 'crop_variety', // 🌟 UPDATED: barangay_id
+        'farmer_id', 'barangay_id', 'crop_id', 'crop_variety',
+        'area_harvested', 'average_yield', 'production', // 🌟 UPDATED: barangay_id
         'dateHarvested', 'quantity', 'quality', 'value'
     ];
 

@@ -26,9 +26,12 @@ class HarvestController extends Controller
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
             'crop_variety' => 'required|string|max:255',
+            'area_harvested' => 'nullable|numeric|min:0',
+            'average_yield' => 'nullable|numeric|min:0',
+            'production' => 'nullable|numeric|min:0',
             'dateHarvested' => 'required|date',
             'quantity' => 'required|string',
-            'quality' => 'required|string',
+            'quality' => 'nullable|string|max:255',
             'value' => 'nullable|string',
         ]);
 
@@ -53,9 +56,12 @@ class HarvestController extends Controller
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
             'crop_variety' => 'required|string|max:255',
+            'area_harvested' => 'nullable|numeric|min:0',
+            'average_yield' => 'nullable|numeric|min:0',
+            'production' => 'nullable|numeric|min:0',
             'dateHarvested' => 'required|date',
             'quantity' => 'required|string',
-            'quality' => 'required|string',
+            'quality' => 'nullable|string|max:255',
             'value' => 'nullable|string',
         ]);
 
