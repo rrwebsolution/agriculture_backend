@@ -25,6 +25,7 @@ class HarvestController extends Controller
             'farmer_id' => 'nullable|exists:farmers,id',
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
+            'crop_variety' => 'required|string|max:255',
             'dateHarvested' => 'required|date',
             'quantity' => 'required|string',
             'quality' => 'required|string',
@@ -51,6 +52,7 @@ class HarvestController extends Controller
             'farmer_id' => 'nullable|exists:farmers,id',
             'barangay_id' => 'required|exists:barangays,id', // 🌟 UPDATED
             'crop_id' => 'required|exists:crops,id',
+            'crop_variety' => 'required|string|max:255',
             'dateHarvested' => 'required|date',
             'quantity' => 'required|string',
             'quality' => 'required|string',
