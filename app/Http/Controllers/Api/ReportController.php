@@ -286,6 +286,7 @@ class ReportController extends Controller
             ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
             ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
+            ->when(isset($filters['crop_variety']), fn ($query) => $query->where('crop_variety', 'like', '%'.$filters['crop_variety'].'%'))
             ->when(isset($filters['farmer_id']), fn ($query) => $query->where('farmer_id', $filters['farmer_id']))
             ->when(isset($filters['quality']), fn ($query) => $query->where('quality', $filters['quality']))
             ->orderBy('dateHarvested')
@@ -439,6 +440,7 @@ class ReportController extends Controller
             ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
             ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
+            ->when(isset($filters['crop_variety']), fn ($query) => $query->where('crop_variety', 'like', '%'.$filters['crop_variety'].'%'))
             ->when(isset($filters['growth_status']), fn ($query) => $query->where('status', $filters['growth_status']))
             ->orderBy('date_planted')
             ->get();
