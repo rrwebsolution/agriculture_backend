@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\PlantingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SystemController;
+use App\Http\Controllers\Api\SystemLabelController;
 use App\Http\Controllers\Api\TechnicianLogController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -86,6 +87,13 @@ Route::middleware(['auth:sanctum', 'token.not_expired', 'token.device_match'])->
     Route::apiResource('technician-logs', TechnicianLogController::class);
 
     Route::get('/notifications/recent', [NotificationController::class, 'recent']);
+
+    Route::get('/system-labels', [SystemLabelController::class, 'index']);
+    Route::middleware('permission:System Settings: Configure Global Settings')->group(function () {
+        Route::get('/system-labels/manage', [SystemLabelController::class, 'manage']);
+        Route::put('/system-labels/bulk', [SystemLabelController::class, 'bulkUpdate']);
+        Route::patch('/system-labels/{label}/reset', [SystemLabelController::class, 'reset']);
+    });
 
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);    // GET    /api/reports

@@ -73,6 +73,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/danger-zones/*',
             'api/nursery-records',
             'api/nursery-records/*',
+            'api/system-labels',
+            'api/system-labels/*',
 
 
 
@@ -82,6 +84,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'token.not_expired' => \App\Http\Middleware\EnsureTokenNotExpired::class,
             'token.device_match' => \App\Http\Middleware\EnsureTokenDeviceMatches::class,
+            'permission' => \App\Http\Middleware\EnsureUserHasPermission::class,
         ]);
 
         //

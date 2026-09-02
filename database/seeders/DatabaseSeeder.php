@@ -21,10 +21,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             RoleSeeder::class,      // Keep first (Users need Roles)
-            BarangaySeeder::class, 
+            BarangaySeeder::class,
             CropSeeder::class,
             ClusterSeeder::class,   // <--- MOVE THIS UP (Users need Clusters)
             UserSeeder::class,      // <--- MOVE THIS DOWN
+            SystemLabelSeeder::class,
         ]);
     }
 }
