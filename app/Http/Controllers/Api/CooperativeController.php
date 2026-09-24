@@ -112,7 +112,7 @@ class CooperativeController extends Controller
     {
         $validated = $request->validate([
             'system_id' => 'required|unique:cooperatives,system_id',
-            'cda_no' => 'required|unique:cooperatives,cda_no',
+            'cda_no' => 'nullable|unique:cooperatives,cda_no',
             'name' => 'required|string',
             'type' => 'required|string',
             'registration' => 'nullable|string',
@@ -145,7 +145,7 @@ class CooperativeController extends Controller
         $old_brgy = $coop->barangay_id;
 
         $validated = $request->validate([
-            'cda_no' => 'required|unique:cooperatives,cda_no,' . $id,
+            'cda_no' => 'nullable|unique:cooperatives,cda_no,' . $id,
             'name' => 'required|string',
             'type' => 'required|string',
             'registration' => 'nullable|string',

@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('farmers', function (Blueprint $table) {
+            $table->date('dob')->nullable()->change();
+        });
+
+        Schema::table('cooperatives', function (Blueprint $table) {
+            $table->string('cda_no')->nullable()->change();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('farmers', function (Blueprint $table) {
+            $table->date('dob')->nullable(false)->change();
+        });
+
+        Schema::table('cooperatives', function (Blueprint $table) {
+            $table->string('cda_no')->nullable(false)->change();
+        });
+    }
+};

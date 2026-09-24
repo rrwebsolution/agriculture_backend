@@ -123,6 +123,7 @@ class FarmerController extends Controller
         }
 
         $request->validate([
+            'dob' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PROFILE_PHOTO_MAX_KB],
             'civil_status' => ['nullable', 'string', 'max:255'],
             'education' => ['nullable', 'string', 'max:255'],
