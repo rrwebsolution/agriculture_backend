@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exports\ReportExport;
 use App\Http\Controllers\Controller;
+use App\Models\Cooperative;
 use App\Models\Expense;
 use App\Models\Farmer;
 use App\Models\Fisherfolk;
@@ -590,6 +591,10 @@ class ReportController extends Controller
             return $this->fetchFisherfolkRegistry();
         }
 
+        if ($this->currentReport?->module === 'Cooperative Listings') {
+            return $this->fetchCooperativeListings();
+        }
+
         $filters = $this->currentReportFilters;
         $farmers = Farmer::with(['barangay', 'crop'])
             ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
@@ -688,6 +693,68 @@ class ReportController extends Controller
         $data['summary'] = $this->sexSummary($fisherfolks);
 
         return $data;
+    }
+
+    private function fetchCooperativeListings(): array
+    {
+        $filters = $this->currentReportFilters;
+        $cooperatives = Cooperative::with('barangay')
+            ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
+            ->when(isset($filters['org_type']), fn ($query) => $query->where('org_type', $filters['org_type']))
+            ->when(isset($filters['type']), fn ($query) => $query->where('type', $filters['type']))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->orderBy('name')
+            ->get();
+
+        // Farmer/Fisherfolk cooperative_id is a JSON array, so count members in PHP
+        $memberCounts = function ($members) {
+            $counts = [];
+            foreach ($members as $coopIds) {
+                foreach (array_unique(array_map('intval', (array) $coopIds)) as $id) {
+                    $counts[$id] = ($counts[$id] ?? 0) + 1;
+                }
+            }
+            return $counts;
+        };
+        $farmerCounts = $memberCounts(Farmer::whereNotNull('cooperative_id')->pluck('cooperative_id'));
+        $fisherfolkCounts = $memberCounts(Fisherfolk::whereNotNull('cooperative_id')->pluck('cooperative_id'));
+
+        $availableFields = [
+            'name' => 'Name',
+            'org_type' => 'Organization Type',
+            'type' => 'Type',
+            'registration' => 'Registered With',
+            'cda_no' => 'Registration No.',
+            'chairman' => 'Chairman',
+            'contact_no' => 'Contact No.',
+            'barangay' => 'Barangay',
+            'address_details' => 'Address Details',
+            'farmer_members' => 'Farmer Members',
+            'fisherfolk_members' => 'Fisherfolk Members',
+            'capital_cbu' => 'Capital Build-up (PHP)',
+            'status' => 'Status',
+        ];
+
+        return $this->buildRows(
+            $availableFields,
+            $cooperatives,
+            fn ($c, $field) => match ($field) {
+                'name' => $this->textValue($c->name, 'Unnamed Cooperative'),
+                'org_type' => $this->textValue($c->org_type, 'Unspecified'),
+                'type' => $this->textValue($c->type, 'Unspecified'),
+                'registration' => $this->textValue($c->registration, 'Not Available'),
+                'cda_no' => $this->textValue($c->cda_no, 'Not Available'),
+                'chairman' => $this->textValue($c->chairman, 'Not Available'),
+                'contact_no' => $this->textValue($c->contact_no, 'No Contact'),
+                'barangay' => $this->textValue($c->barangay->name ?? null, 'Unknown Barangay'),
+                'address_details' => $this->textValue($c->address_details, 'No Address Details'),
+                'farmer_members' => (string) ($farmerCounts[$c->id] ?? 0),
+                'fisherfolk_members' => (string) ($fisherfolkCounts[$c->id] ?? 0),
+                'capital_cbu' => $this->numberValue($c->capital_cbu),
+                'status' => $this->textValue($c->status, 'Unspecified'),
+                default => '',
+            }
+        );
     }
 
     private function fetchBarangayProfile(): array
@@ -814,6 +881,7 @@ class ReportController extends Controller
             'Fish Catch Data' => $this->fetchFishery($report->period_from, $report->period_to),
             'Farmer Registry' => $this->fetchCensus(),
             'Fisherfolk Registry' => $this->fetchFisherfolkRegistry(),
+            'Cooperative Listings' => $this->fetchCooperativeListings(),
             'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->fetchFinancial($report->period_from, $report->period_to),
             'Barangay Profile' => $this->fetchBarangayProfile(),
             default => ['headers' => [], 'rows' => []],
@@ -844,6 +912,7 @@ class ReportController extends Controller
             'Expense Summary', 'Program Expenditures', 'Budget Utilization' => $this->dateRangeFromModel(Expense::query(), 'date_incurred'),
             'Farmer Registry' => $this->dateRangeFromModel(Farmer::query(), 'created_at'),
             'Fisherfolk Registry' => $this->dateRangeFromModel(Fisherfolk::query(), 'created_at'),
+            'Cooperative Listings' => $this->dateRangeFromModel(Cooperative::query(), 'created_at'),
             'Barangay Profile' => $this->dateRangeFromModel(\App\Models\Barangay::query(), 'created_at'),
             'Equipment Status', 'Supply Inventory', 'Distribution Records' => $this->dateRangeFromModel(Inventory::query(), 'created_at'),
             default => [null, null],
