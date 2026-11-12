@@ -600,12 +600,45 @@ class ReportController extends Controller
             ->when(isset($filters['barangay_id']), fn ($query) => $query->where('barangay_id', $filters['barangay_id']))
             ->when(isset($filters['barangay']), fn ($query) => $query->whereHas('barangay', fn ($relation) => $relation->where('name', $filters['barangay'])))
             ->when(isset($filters['crop_id']), fn ($query) => $query->where('crop_id', $filters['crop_id']))
-            ->when(isset($filters['crop']), fn ($query) => $query->whereHas('crop', fn ($relation) => $relation->where('category', $filters['crop'])))
             ->when(isset($filters['gender']), fn ($query) => $query->where('gender', $filters['gender']))
             ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
             ->when(isset($filters['is_main_livelihood']), fn ($query) => $query->where('is_main_livelihood', filter_var($filters['is_main_livelihood'], FILTER_VALIDATE_BOOLEAN)))
             ->orderBy('last_name')
             ->get();
+
+        // Crop filters look at every farm of the farmer, not just the first one.
+        // "crop" is the crop category (e.g. Industrial Crops) and "crop_variety" is the
+        // specific type/variety inside it (e.g. Cacao vs Coffee).
+        $cropCategoryIds = isset($filters['crop'])
+            ? \App\Models\Crop::where('category', $filters['crop'])->pluck('id')->map(fn ($id) => (string) $id)->all()
+            : null;
+        $cropType = isset($filters['crop_variety']) ? mb_strtolower(trim($filters['crop_variety'])) : null;
+        $hasCropFilter = $cropCategoryIds !== null || ($cropType !== null && $cropType !== '');
+
+        $matchingFarms = function ($farmer) use ($cropCategoryIds, $cropType) {
+            $farms = is_array($farmer->farms_list) ? $farmer->farms_list : [];
+            if (empty($farms) && $farmer->crop_id) {
+                $farms = [['crop_id' => $farmer->crop_id, 'crop_types' => [], 'total_area' => $farmer->total_area]];
+            }
+
+            return array_values(array_filter($farms, function ($farm) use ($cropCategoryIds, $cropType) {
+                if ($cropCategoryIds !== null && ! in_array((string) ($farm['crop_id'] ?? ''), $cropCategoryIds, true)) {
+                    return false;
+                }
+                if ($cropType !== null && $cropType !== '') {
+                    $types = array_map(fn ($t) => mb_strtolower(trim((string) $t)), (array) ($farm['crop_types'] ?? []));
+                    if (! in_array($cropType, $types, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }));
+        };
+
+        if ($hasCropFilter) {
+            $farmers = $farmers->filter(fn ($f) => count($matchingFarms($f)) > 0)->values();
+        }
 
         $availableFields = [
             'full_name' => 'Full Name',
@@ -616,6 +649,7 @@ class ReportController extends Controller
             'address_details' => 'Address Details',
             'contact_no' => 'Contact No.',
             'primary_crop' => 'Primary Crop',
+            'crop_types' => 'Crop Type / Variety',
             'farm_area' => 'Farm Area (ha)',
             'ownership' => 'Ownership',
             'soil_type' => 'Soil Type',
@@ -626,6 +660,13 @@ class ReportController extends Controller
             $availableFields,
             $farmers,
             fn ($f, $field) => match ($field) {
+                'crop_types' => $this->textValue(
+                    implode(', ', array_unique(array_merge(...array_map(
+                        fn ($farm) => array_map(fn ($t) => trim((string) $t), (array) ($farm['crop_types'] ?? [])),
+                        $matchingFarms($f)
+                    ) ?: [[]]))),
+                    'Unspecified'
+                ),
                 'full_name' => $this->textValue(trim("{$f->last_name}, {$f->first_name}" . ($f->middle_name ? ' ' . $f->middle_name[0] . '.' : '')), 'Unknown Farmer'),
                 'gender' => $this->textValue($f->gender, 'Unspecified'),
                 'civil_status' => $this->textValue($f->civil_status, 'Unspecified'),
@@ -634,7 +675,11 @@ class ReportController extends Controller
                 'address_details' => $this->textValue($f->address_details, 'No Address Details'),
                 'contact_no' => $this->textValue($f->contact_no, 'No Contact'),
                 'primary_crop' => $this->textValue($f->crop->name ?? $f->crop->category ?? null, 'Unknown Crop'),
-                'farm_area' => $this->numberValue($f->total_area),
+                'farm_area' => $this->numberValue(
+                    $hasCropFilter
+                        ? array_sum(array_map(fn ($farm) => (float) ($farm['total_area'] ?? 0), $matchingFarms($f)))
+                        : $f->total_area
+                ),
                 'ownership' => $this->textValue($f->ownership_type, 'Unspecified'),
                 'soil_type' => $this->textValue($f->soil_type, 'Unspecified'),
                 'status' => $this->textValue($f->status, 'Unspecified'),
